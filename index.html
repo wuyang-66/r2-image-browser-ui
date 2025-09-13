@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>迅驰工具编号在线查询</title>
+    <title>Cloud 迅驰工具在线查询</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -11,37 +11,13 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
             background-color: #f8fafc;
         }
-        
-        /* 弹窗进入动画 */
-        @keyframes modal-in {
-            from { opacity: 0; transform: scale(0.95) translateY(20px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        
-        /* 背景遮罩层进入动画 */
-        @keyframes fade-in {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        /* 图片卡片加载动画 */
-        @keyframes popIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-        }
-
-        .modal-enter {
-            animation: modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        .fade-in-bg {
-            animation: fade-in 0.3s ease-out forwards;
-        }
-
-        /* 防止页面在弹窗打开时滚动 */
-        .no-scroll {
-            overflow: hidden;
-        }
+        /* 各种动画效果 */
+        @keyframes modal-in { from { opacity: 0; transform: scale(0.95) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .modal-enter { animation: modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .fade-in-bg { animation: fade-in 0.3s ease-out forwards; }
+        .no-scroll { overflow: hidden; }
     </style>
 </head>
 <body class="antialiased text-slate-800">
@@ -51,15 +27,16 @@
             <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-teal-400">
                 迅驰工具编号在线查询
             </h1>
-            <p class="mt-3 text-lg text-slate-500">任何地方都可快捷搜索、预览和查看工具详情</p>
+            <p class="mt-3 text-lg text-slate-500">随时随地-查看工具编号</p>
         </header>
 
+        <!-- 搜索区域 -->
         <div class="relative max-w-2xl mx-auto" id="search-container">
             <div class="relative">
                 <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <i data-lucide="search" class="w-5 h-5 text-slate-400"></i>
                 </div>
-                <input type="search" id="search-input" placeholder="输入图片名称进行搜索..."
+                <input type="search" id="search-input" placeholder="输入编号进行搜索..."
                        class="w-full pl-12 pr-4 py-3 text-base border-2 border-slate-200 rounded-full shadow-sm 
                               focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none
                               transition-all duration-300 ease-in-out"
@@ -70,47 +47,36 @@
             </div>
         </div>
 
-        <main id="gallery" class="mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        </main>
-        
+        <!-- 图片画廊和消息区域 -->
+        <main id="gallery" class="mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></main>
         <div id="gallery-message" class="mt-12"></div>
     </div>
     
     <!-- 图片详情弹窗 (Modal) -->
     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-        <!-- 背景遮罩层 -->
-        <div id="modal-overlay" class="absolute inset-0 bg-black/70 fade-in-bg"></div>
-        
-        <!-- 弹窗内容 -->
+        <div id="modal-overlay" class="absolute inset-0 bg-black/70 fade-in-bg" aria-hidden="true"></div>
         <div id="modal-content" class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden modal-enter">
-            <!-- 关闭按钮 -->
             <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-400 hover:text-slate-800 transition-colors z-20">
                 <i data-lucide="x" class="w-8 h-8"></i>
             </button>
-            
-            <!-- 图片区域 -->
             <div class="w-full md:w-3/5 bg-slate-100 flex items-center justify-center p-4">
                 <img id="modal-image" src="" alt="详情图片" class="max-w-full max-h-[40vh] md:max-h-[80vh] object-contain">
             </div>
-            
-            <!-- 详情信息区域 -->
             <div class="w-full md:w-2/5 p-8 overflow-y-auto">
                 <h2 id="modal-title" class="text-3xl font-bold text-slate-800"></h2>
                 <div class="mt-6 space-y-4 text-slate-600">
                     <div>
                         <h3 class="font-semibold text-slate-800">产品名称</h3>
-                        <p id="modal-product-name">与图片文件名相同或自定义</p>
+                        <p id="modal-product-name"></p>
                     </div>
                     <div>
                         <h3 class="font-semibold text-slate-800">功能用途</h3>
-                        <p id="modal-description">这里是关于这个产品或图片的详细描述。您可以根据需要从数据库或另一个API获取这些信息，并在此处展示给用户。</p>
+                        <p id="modal-description"></p>
                     </div>
-                    <!-- 可以添加更多信息 -->
                 </div>
             </div>
         </div>
     </div>
-
 
     <script>
         // --- 配置项 ---
@@ -124,12 +90,14 @@
         const galleryMessage = document.getElementById('gallery-message');
         const suggestionsBox = document.getElementById('suggestions-box');
         const suggestionsList = document.getElementById('suggestions-list');
-        const searchContainer = document.getElementById('search-container'); // <-- 修正：获取搜索容器元素
+        const searchContainer = document.getElementById('search-container');
         const modal = document.getElementById('modal');
         const modalOverlay = document.getElementById('modal-overlay');
         const modalCloseBtn = document.getElementById('modal-close-btn');
         const modalImage = document.getElementById('modal-image');
         const modalTitle = document.getElementById('modal-title');
+        const modalProductName = document.getElementById('modal-product-name');
+        const modalDescription = document.getElementById('modal-description');
         
         let debounceTimer;
 
@@ -145,38 +113,31 @@
             lucide.createIcons();
         }
         
-        /**
-         * 渲染图片画廊
-         * @param {Array<Object>} images - 图片对象数组, e.g., [{key: "XC1201.jpg", displayName: "XC1201"}]
-         */
         function renderGallery(images) {
             galleryMessage.innerHTML = '';
             gallery.innerHTML = '';
-
             if (images.length === 0) {
                 showMessage('info', '未找到符合条件的图片。');
                 return;
             }
-
             images.forEach((image, index) => {
                 const imageUrl = `${R2_BUCKET_URL}/${image.key}`;
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 group cursor-pointer';
-                card.style.animationDelay = `${index * 50}ms`;
+                card.style.animation = `popIn 0.5s ease-out ${index * 50}ms forwards`;
                 card.style.opacity = '0';
-                card.style.animation = 'popIn 0.5s ease-out forwards';
                 
-                // 将图片信息存储在DOM元素上以便后续访问
+                // 将所有需要的信息存储在data属性中
                 card.dataset.imageUrl = imageUrl;
                 card.dataset.displayName = image.displayName;
+                card.dataset.productName = image.productName;
+                card.dataset.description = image.description;
 
                 card.innerHTML = `
                     <div class="relative overflow-hidden aspect-video">
                         <img src="${imageUrl}" alt="${image.displayName}" loading="lazy" 
                              class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-in-out">
-                        <!-- 新的遮罩效果：默认透明，悬停时变暗 -->
-                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                              <p class="text-white font-bold text-lg">查看详情</p>
                         </div>
                     </div>
@@ -190,18 +151,16 @@
         }
 
         async function performSearch(query) {
-            if (!query) {
-                showMessage('info', '迅驰工具 XCTOOL');
+             if (!query) {
+                showMessage('info', '迅驰工具/XCTOOL');
                 return;
             }
             showMessage('loading', `正在搜索 "${query}"...`);
             suggestionsBox.classList.add('hidden');
-
             try {
                 const response = await fetch(`${API_WORKER_URL}/search?q=${encodeURIComponent(query)}`);
                 if (!response.ok) throw new Error(`服务器响应错误: ${response.status}`);
                 const data = await response.json();
-
                 if (data.success && data.images) {
                     renderGallery(data.images);
                 } else {
@@ -214,7 +173,7 @@
         }
         
         async function fetchSuggestions(query) {
-             if (!query) {
+            if (!query) {
                 suggestionsBox.classList.add('hidden');
                 return;
             }
@@ -234,7 +193,7 @@
         }
         
         function renderSuggestions(suggestions) {
-            if (suggestions.length === 0) {
+             if (suggestions.length === 0) {
                 suggestionsBox.classList.add('hidden');
                 return;
             }
@@ -254,12 +213,11 @@
             suggestionsBox.classList.remove('hidden');
         }
 
-        // --- 弹窗 (Modal) 控制 ---
-        function openModal(displayName, imageUrl) {
-            modalImage.src = imageUrl;
-            modalTitle.textContent = displayName;
-            // 可以在这里根据displayName从其他地方获取真实的产品信息
-            document.getElementById('modal-product-name').textContent = displayName;
+        function openModal(cardData) {
+            modalImage.src = cardData.imageUrl;
+            modalTitle.textContent = cardData.displayName;
+            modalProductName.textContent = cardData.productName;
+            modalDescription.textContent = cardData.description;
             
             modal.classList.remove('hidden');
             document.body.classList.add('no-scroll');
@@ -271,46 +229,26 @@
         }
 
         // --- 事件监听器 ---
-        searchInput.addEventListener('input', () => {
-            clearTimeout(debounceTimer);
-            const query = searchInput.value.trim();
-            debounceTimer = setTimeout(() => fetchSuggestions(query), DEBOUNCE_DELAY);
-        });
-
-        searchInput.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') performSearch(searchInput.value.trim());
-        });
-
-        document.addEventListener('click', (e) => {
-            // <-- 修正：使用获取到的 searchContainer 变量
-            if (!searchContainer.contains(e.target)) {
-                suggestionsBox.classList.add('hidden');
-            }
-        });
+        searchInput.addEventListener('input', () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(() => fetchSuggestions(searchInput.value.trim()), DEBOUNCE_DELAY); });
+        searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') performSearch(searchInput.value.trim()); });
+        document.addEventListener('click', (e) => { if (!searchContainer.contains(e.target)) { suggestionsBox.classList.add('hidden'); } });
         
-        // 使用事件委托来处理所有图片卡片的点击事件
         gallery.addEventListener('click', (e) => {
             const card = e.target.closest('.group');
             if (card && card.dataset.imageUrl) {
-                openModal(card.dataset.displayName, card.dataset.imageUrl);
+                openModal(card.dataset);
             }
         });
 
-        // 关闭弹窗的事件
         modalOverlay.addEventListener('click', closeModal);
         modalCloseBtn.addEventListener('click', closeModal);
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-                closeModal();
-            }
-        });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) { closeModal(); } });
 
         // --- 初始化 ---
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
-            showMessage('info', '迅驰工具 XCTOOL');
+            showMessage('info', '迅驰工具/XCTOOL');
         });
-
     </script>
 </body>
 </html>
