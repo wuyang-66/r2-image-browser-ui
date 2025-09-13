@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>迅驰工具编号在线查询 v2</title>
+    <title>迅驰工具编号在线查询</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -22,6 +22,12 @@
         @keyframes fade-in {
             from { opacity: 0; }
             to { opacity: 1; }
+        }
+
+        /* 图片卡片加载动画 */
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
 
         .modal-enter {
@@ -118,6 +124,7 @@
         const galleryMessage = document.getElementById('gallery-message');
         const suggestionsBox = document.getElementById('suggestions-box');
         const suggestionsList = document.getElementById('suggestions-list');
+        const searchContainer = document.getElementById('search-container'); // <-- 修正：获取搜索容器元素
         const modal = document.getElementById('modal');
         const modalOverlay = document.getElementById('modal-overlay');
         const modalCloseBtn = document.getElementById('modal-close-btn');
@@ -275,7 +282,10 @@
         });
 
         document.addEventListener('click', (e) => {
-            if (!search-container.contains(e.target)) suggestionsBox.classList.add('hidden');
+            // <-- 修正：使用获取到的 searchContainer 变量
+            if (!searchContainer.contains(e.target)) {
+                suggestionsBox.classList.add('hidden');
+            }
         });
         
         // 使用事件委托来处理所有图片卡片的点击事件
@@ -304,3 +314,4 @@
     </script>
 </body>
 </html>
+
