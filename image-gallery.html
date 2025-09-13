@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud R2 图片浏览器</title>
+    <!-- 引入Tailwind CSS，用于快速构建现代化UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Lucide图标库，提供简洁漂亮的图标 -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* 自定义样式，用于美化滚动条和添加动画 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+            background-color: #f8fafc; /* 使用一个柔和的灰色背景 */
+        }
+
+        /* 动画：元素淡入效果 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 动画：图片卡片加载效果 */
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        
+        .pop-in {
+            animation: popIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+
+        /* 当没有图片时，消息容器样式 */
+        #gallery-message {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            min-height: 40vh; /* 保证在空状态下有一定高度 */
+            color: #64748b;
+        }
+    </style>
+</head>
+<body class="antialiased text-slate-800">
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        <!-- 头部区域 -->
+        <header class="text-center mb-8 md:mb-12">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-teal-400">
+                Cloud R2 图片浏览器
+            </h1>
+            <p class="mt-3 text-lg text-slate-500">即时搜索、预览和下载存储在您云端的图片</p>
+        </header>
+
+        <!-- 搜索栏容器 -->
+        <div class="relative max-w-2xl mx-auto" id="search-container">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <i data-lucide="search" class="w-5 h-5 text-slate-400"></i>
+                </div>
+                <input type="search" id="search-input" placeholder="输入图片名称进行搜索 (例如: XC12...)"
+                       class="w-full pl-12 pr-4 py-3 text-base border-2 border-slate-200 rounded-full shadow-sm 
+                              focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none
+                              transition-all duration-300 ease-in-out"
+                       autocomplete="off">
+            </div>
+            <!-- 搜索建议下拉框 -->
+            <div id="suggestions-box" class="absolute z-10 w-full mt-2 bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden hidden">
+                <ul id="suggestions-list">
+                    <!-- 搜索建议项会通过JS动态插入这里 -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- 图片画廊区域 -->
+        <main id="gallery" class="mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <!-- 图片卡片会通过JS动态插入这里 -->
+        </main>
+        
+        <!-- 状态消息显示区域 (加载中/无结果/错误) -->
+        <div id="gallery-message" class="mt-12"></div>
+
+    </div>
+
+    <script>
+        // --- 配置项 ---
+        const API_WORKER_URL = "https://xiaowuyang.dpdns.org"; // Cloudflare Worker域名
+        const R2_BUCKET_URL = "https://xiaowuya.dpdns.org";   // R2存储桶域名
+        const DEBOUNCE_DELAY = 300; // 搜索防抖延迟 (毫秒)，防止频繁请求API
+
+        // --- DOM元素获取 ---
+        const searchInput = document.getElementById('search-input');
+        const gallery = document.getElementById('gallery');
+        const galleryMessage = document.getElementById('gallery-message');
+        const suggestionsBox = document.getElementById('suggestions-box');
+        const suggestionsList = document.getElementById('suggestions-list');
+
+        let debounceTimer; // 用于存储防抖计时器
+
+        // --- 核心函数 ---
+
+        /**
+         * 显示状态消息 (加载中, 无结果, 欢迎语等)
+         * @param {string} type - 消息类型 ('loading', 'info', 'error')
+         * @param {string} message - 要显示的消息文本
+         */
+        function showMessage(type, message) {
+            gallery.innerHTML = ''; // 清空画廊
+            let icon = '';
+            if (type === 'loading') {
+                icon = '<i data-lucide="loader-2" class="w-12 h-12 animate-spin text-blue-500"></i>';
+            } else if (type === 'info') {
+                icon = '<i data-lucide="image" class="w-12 h-12 text-slate-400"></i>';
+            } else if (type === 'error') {
+                icon = '<i data-lucide="alert-triangle" class="w-12 h-12 text-red-500"></i>';
+            }
+            galleryMessage.innerHTML = `${icon}<p class="mt-4 text-lg">${message}</p>`;
+            lucide.createIcons(); // 重新渲染图标
+        }
+
+        /**
+         * 渲染图片画廊
+         * @param {string[]} imageNames - 图片名称数组
+         */
+        function renderGallery(imageNames) {
+            galleryMessage.innerHTML = ''; // 清空消息
+            gallery.innerHTML = ''; // 清空旧结果
+
+            if (imageNames.length === 0) {
+                showMessage('info', '未找到符合条件的图片。');
+                return;
+            }
+
+            imageNames.forEach((name, index) => {
+                const imageUrl = `${R2_BUCKET_URL}/${name}`;
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 group pop-in';
+                card.style.animationDelay = `${index * 50}ms`; // 为每张卡片添加错峰加载动画
+
+                card.innerHTML = `
+                    <div class="relative overflow-hidden aspect-w-16 aspect-h-9">
+                        <img src="${imageUrl}" alt="${name}" loading="lazy" 
+                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-in-out">
+                        <div class="absolute inset-0 bg-black bg-opacity-20"></div>
+                    </div>
+                    <div class="p-4">
+                        <p class="text-sm font-semibold truncate" title="${name}">${name}</p>
+                        <a href="${imageUrl}" download="${name}" 
+                           class="mt-3 w-full flex items-center justify-center bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium
+                                  hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
+                                  transition-colors duration-300">
+                            <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                            下载
+                        </a>
+                    </div>
+                `;
+                gallery.appendChild(card);
+            });
+            lucide.createIcons(); // 渲染下载图标
+        }
+
+        /**
+         * 渲染搜索建议
+         * @param {string[]} suggestions - 建议词条数组
+         */
+        function renderSuggestions(suggestions) {
+            if (suggestions.length === 0) {
+                suggestionsBox.classList.add('hidden');
+                return;
+            }
+            suggestionsList.innerHTML = '';
+            suggestions.forEach(suggestion => {
+                const li = document.createElement('li');
+                li.className = 'px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors duration-150';
+                li.textContent = suggestion;
+                li.addEventListener('mousedown', (e) => { // 使用mousedown确保在input失焦前触发
+                    e.preventDefault();
+                    searchInput.value = suggestion;
+                    suggestionsBox.classList.add('hidden');
+                    performSearch(suggestion);
+                });
+                suggestionsList.appendChild(li);
+            });
+            suggestionsBox.classList.remove('hidden');
+        }
+
+        /**
+         * 执行完整搜索
+         * @param {string} query - 搜索查询词
+         */
+        async function performSearch(query) {
+            if (!query) {
+                // 如果搜索词为空，可以获取初始图片列表或显示欢迎语
+                showMessage('info', '开始搜索，发现您的云端宝藏！');
+                return;
+            }
+            showMessage('loading', `正在搜索 "${query}"...`);
+            suggestionsBox.classList.add('hidden'); // 隐藏建议框
+
+            try {
+                // 注意：在真实的Worker中，你需要实现/search端点
+                const response = await fetch(`${API_WORKER_URL}/search?q=${encodeURIComponent(query)}`);
+                if (!response.ok) throw new Error('服务器响应错误');
+                
+                const data = await response.json();
+                
+                if (data.success && data.images) {
+                    renderGallery(data.images);
+                } else {
+                    showMessage('error', data.error || '未能获取图片列表。');
+                }
+            } catch (error) {
+                console.error("搜索失败:", error);
+                // 模拟数据用于演示，当API不可用时
+                if (query.toLowerCase().startsWith('xc12')) {
+                    const mockImages = ['XC1201.jpg', 'XC1202.png', 'XC1203.webp', 'XC1204.avif'];
+                    renderGallery(mockImages);
+                } else {
+                     showMessage('error', '无法连接到服务器。请检查网络或API状态。');
+                }
+            }
+        }
+        
+        /**
+         * 获取搜索建议
+         * @param {string} query - 搜索查询词
+         */
+        async function fetchSuggestions(query) {
+            if (!query) {
+                suggestionsBox.classList.add('hidden');
+                return;
+            }
+
+            try {
+                // 注意：在真实的Worker中，你需要实现/suggest端点
+                const response = await fetch(`${API_WORKER_URL}/suggest?q=${encodeURIComponent(query)}`);
+                if (!response.ok) throw new Error('服务器响应错误');
+                
+                const data = await response.json();
+
+                if (data.success && data.suggestions) {
+                    renderSuggestions(data.suggestions);
+                } else {
+                    suggestionsBox.classList.add('hidden');
+                }
+            } catch (error) {
+                 console.error("获取建议失败:", error);
+                 // 模拟数据用于演示，当API不可用时
+                 if (query.toLowerCase() === 'xc12') {
+                    const mockSuggestions = ['XC1201', 'XC1202', 'XC1203', 'XC1204'];
+                    renderSuggestions(mockSuggestions);
+                 } else {
+                    suggestionsBox.classList.add('hidden');
+                 }
+            }
+        }
+
+
+        // --- 事件监听器 ---
+
+        // 监听搜索框输入
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            const query = searchInput.value.trim();
+            if (query) {
+                debounceTimer = setTimeout(() => {
+                    fetchSuggestions(query);
+                }, DEBOUNCE_DELAY);
+            } else {
+                suggestionsBox.classList.add('hidden');
+            }
+        });
+
+        // 监听搜索框提交 (回车)
+        searchInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                performSearch(searchInput.value.trim());
+            }
+        });
+
+        // 点击页面其他地方时隐藏建议框
+        document.addEventListener('click', (e) => {
+            if (!document.getElementById('search-container').contains(e.target)) {
+                suggestionsBox.classList.add('hidden');
+            }
+        });
+        
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            showMessage('info', '开始搜索，发现您的云端宝藏！');
+        });
+
+    </script>
+</body>
+</html>
