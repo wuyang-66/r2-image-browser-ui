@@ -245,7 +245,7 @@
 
         async function performSearch(query) {
              if (!query) {
-                showMessage('info', '请输入关键词进行搜索。');
+                showMessage('info', '请输入“编号”或“关键词”进行搜索。');
                 return;
             }
             showMessage('loading', `正在搜索 "${query}"...`);
@@ -355,7 +355,7 @@
                     searchInput.value = CONFIG.DEFAULT_PREFIX;
                 }
             } else { // name search
-                searchInput.placeholder = '输入产品名称进行搜索...';
+                searchInput.placeholder = '输入产品名称关键词进行搜索...';
                 prefixToggleContainer.style.display = 'none';
                 suggestionsBox.classList.add('hidden');
             }
