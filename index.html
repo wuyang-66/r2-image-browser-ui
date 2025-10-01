@@ -3,37 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud 迅驰工具在线查询</title>
+    <title>迅驰工具在线查询</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
-            --brand-color-from: #3b82f6; /* blue-500 */
-            --brand-color-to: #14b8a6;   /* teal-500 */
+            --brand-color-from: #3b82f6;
+            --brand-color-to: #14b8a6;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-            background-color: #f8fafc; /* slate-50 */
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+            background-color: #f8fafc;
         }
-        /* 动画效果 */
-        @keyframes modal-in { from { opacity: 0; transform: scale(0.95) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        .modal-enter { animation: modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .fade-in-bg { animation: fade-in 0.3s ease-out forwards; }
-        .no-scroll { overflow: hidden; }
 
-        /* 图片加载占位符 */
         .image-placeholder {
-            background-color: #e2e8f0; /* slate-200 */
+            background-color: #e2e8f0;
             display: flex;
             align-items: center;
             justify-content: center;
             width: 100%;
             height: 100%;
         }
-        
-        /* 自定义Toggle开关 */
+
         .toggle-checkbox:checked {
             right: 0;
             border-color: var(--brand-color-from);
@@ -42,32 +33,20 @@
             background-color: var(--brand-color-from);
         }
 
-        /* 隐藏浏览器默认的搜索框清除按钮 */
-        input[type="search"]::-webkit-search-decoration,
-        input[type="search"]::-webkit-search-cancel-button,
-        input[type="search"]::-webkit-search-results-button,
-        input[type="search"]::-webkit-search-results-decoration {
-            -webkit-appearance: none;
-        }
-
-        /* 搜索类型切换按钮 */
         .search-type-btn {
             padding: 8px 16px;
             border-radius: 9999px;
-            border: 1px solid #cbd5e1; /* slate-300 */
+            border: 1px solid #cbd5e1;
             cursor: pointer;
-            transition: all 0.2s ease-in-out;
             font-weight: 500;
             background-color: white;
-            color: #475569; /* slate-600 */
+            color: #475569;
+            transition: all 0.2s ease-in-out;
         }
         .search-type-btn.active {
             background-color: var(--brand-color-from);
             color: white;
             border-color: var(--brand-color-from);
-        }
-        .search-type-btn:not(.active):hover {
-            background-color: #f1f5f9; /* slate-100 */
         }
     </style>
 </head>
@@ -89,14 +68,13 @@
             <p class="mt-3 text-lg text-slate-500">随时随地，查看工具信息</p>
         </header>
 
-        <!-- 新增: 搜索类型切换 -->
         <div id="search-type-switcher" class="flex justify-center mb-6 space-x-2">
             <button data-type="id" class="search-type-btn active">按编号搜索</button>
-            <button data-type="name" class="search-type-btn">按名称搜索（升级中）</button>
+            <button data-type="name" class="search-type-btn">按名称/关键词搜索</button>
         </div>
 
         <div class="max-w-2xl mx-auto relative">
-            <div class="relative" id="search-container">
+            <div id="search-container" class="relative">
                 <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <i data-lucide="search" class="w-5 h-5 text-slate-400"></i>
                 </div>
@@ -106,25 +84,21 @@
                               focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none
                               transition-all duration-300 ease-in-out"
                        autocomplete="off">
-                <button id="clear-btn" class="absolute inset-y-0 right-0 pr-4 flex items-center cursor-pointer hidden" aria-label="清空搜索框">
+                <button id="clear-btn" class="absolute inset-y-0 right-0 pr-4 flex items-center cursor-pointer hidden">
                     <i data-lucide="x-circle" class="w-5 h-5 text-slate-400 hover:text-slate-600"></i>
                 </button>
-            </div>
-            
-            <div id="suggestions-box" class="absolute z-40 w-full mt-2 bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden hidden max-w-2xl">
-                <ul id="suggestions-list"></ul>
             </div>
         </div>
 
         <main id="gallery" class="mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></main>
         <div id="gallery-message" class="mt-12"></div>
     </div>
-    
-    <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div id="modal-overlay" class="absolute inset-0 bg-black/70 fade-in-bg" aria-hidden="true"></div>
-        <div id="modal-content" class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden modal-enter">
+
+    <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+        <div id="modal-overlay" class="absolute inset-0 bg-black/70"></div>
+        <div id="modal-content" class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden">
             <div class="w-full md:w-3/5 bg-slate-100 flex items-center justify-center p-4 relative">
-                <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-20 bg-white/50 rounded-full p-1" aria-label="关闭弹窗">
+                <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-20 bg-white/50 rounded-full p-1">
                     <i data-lucide="x" class="w-7 h-7"></i>
                 </button>
                 <img id="modal-image" src="" alt="详情图片" class="max-w-full max-h-[40vh] md:max-h-[80vh] object-contain">
@@ -147,56 +121,47 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // --- 1. 配置项和状态管理 ---
         const CONFIG = {
-            API_WORKER_URL: "https://xiaowuyang.dpdns.org", // 你的Worker URL
-            R2_BUCKET_URL: "https://xiaowuya.dpdns.org",    // 你的R2 Public URL
+            API_WORKER_URL: "https://xiaowuyang.dpdns.org",
+            R2_BUCKET_URL: "https://xiaowuya.dpdns.org",
             DEBOUNCE_DELAY: 300,
             DEFAULT_PREFIX: "XC"
         };
-        const state = { 
-            debounceTimer: null, 
-            isPrefixEnabled: true, 
-            lastFocusedElement: null,
-            searchType: 'id' // 'id' 或 'name'
+
+        const state = { debounceTimer: null, isPrefixEnabled: true, searchType: 'id' };
+
+        const elements = {
+            searchInput: document.getElementById('search-input'),
+            clearBtn: document.getElementById('clear-btn'),
+            prefixToggle: document.getElementById('prefix-toggle'),
+            searchTypeSwitcher: document.getElementById('search-type-switcher'),
+            gallery: document.getElementById('gallery'),
+            galleryMessage: document.getElementById('gallery-message'),
+            suggestionsBox: document.getElementById('suggestions-box'),
+            suggestionsList: document.getElementById('suggestions-list'),
+            modal: document.getElementById('modal'),
+            modalOverlay: document.getElementById('modal-overlay'),
+            modalCloseBtn: document.getElementById('modal-close-btn'),
+            modalImage: document.getElementById('modal-image'),
+            modalTitle: document.getElementById('modal-title'),
+            modalProductName: document.getElementById('modal-product-name'),
+            modalDescription: document.getElementById('modal-description')
         };
 
-        // --- 2. DOM元素获取 ---
-        const searchInput = document.getElementById('search-input');
-        const clearBtn = document.getElementById('clear-btn');
-        const prefixToggle = document.getElementById('prefix-toggle');
-        const prefixToggleContainer = document.getElementById('prefix-toggle-container');
-        const gallery = document.getElementById('gallery');
-        const galleryMessage = document.getElementById('gallery-message');
-        const suggestionsBox = document.getElementById('suggestions-box');
-        const suggestionsList = document.getElementById('suggestions-list');
-        const searchContainer = document.getElementById('search-container');
-        const searchTypeSwitcher = document.getElementById('search-type-switcher');
-        const modal = document.getElementById('modal');
-        const modalOverlay = document.getElementById('modal-overlay');
-        const modalCloseBtn = document.getElementById('modal-close-btn');
-        const modalContent = document.getElementById('modal-content');
-        const modalImage = document.getElementById('modal-image');
-        const modalTitle = document.getElementById('modal-title');
-        const modalProductName = document.getElementById('modal-product-name');
-        const modalDescription = document.getElementById('modal-description');
-        
-        // --- 3. 核心功能函数 ---
-
-        function showMessage(type, message) {
-            gallery.innerHTML = '';
+        const showMessage = (type, message) => {
+            elements.gallery.innerHTML = '';
             let icon = '';
             const iconClasses = "w-12 h-12";
             if (type === 'loading') icon = `<i data-lucide="loader-2" class="${iconClasses} animate-spin text-blue-500"></i>`;
             else if (type === 'info') icon = `<i data-lucide="search" class="${iconClasses} text-slate-400"></i>`;
             else if (type === 'error') icon = `<i data-lucide="alert-triangle" class="${iconClasses} text-red-500"></i>`;
-            galleryMessage.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[30vh] text-slate-500">${icon}<p class="mt-4 text-lg text-center">${message}</p></div>`;
+            elements.galleryMessage.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[30vh] text-slate-500">${icon}<p class="mt-4 text-lg text-center">${message}</p></div>`;
             lucide.createIcons();
-        }
-        
-        function renderGallery(images) {
-            galleryMessage.innerHTML = '';
-            gallery.innerHTML = '';
+        };
+
+        const renderGallery = (images) => {
+            elements.galleryMessage.innerHTML = '';
+            elements.gallery.innerHTML = '';
             if (images.length === 0) {
                 showMessage('info', '未找到符合条件的结果。');
                 return;
@@ -206,15 +171,13 @@
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 group cursor-pointer';
                 card.style.animation = `popIn 0.5s ease-out ${index * 50}ms forwards`;
-                card.style.opacity = '0';
                 card.setAttribute('role', 'button');
                 card.setAttribute('tabindex', '0');
-                
                 card.dataset.imageUrl = imageUrl;
                 card.dataset.displayName = image.displayName;
                 card.dataset.productName = image.productName;
                 card.dataset.description = image.description;
-
+                
                 card.innerHTML = `
                     <div class="relative overflow-hidden aspect-square">
                         <div class="absolute inset-0 image-placeholder">
@@ -231,30 +194,27 @@
                         <p class="text-xs text-slate-400 text-center mt-1">${image.displayName}</p>
                     </div>
                 `;
-                
+
                 const imgElement = card.querySelector('img');
                 const placeholder = card.querySelector('.image-placeholder');
-                
+
                 imgElement.onload = () => { placeholder.style.display = 'none'; imgElement.style.opacity = '1'; };
                 imgElement.onerror = () => { placeholder.innerHTML = '<i data-lucide="image-off" class="w-8 h-8 text-slate-400"></i>'; lucide.createIcons(); };
 
-                gallery.appendChild(card);
+                elements.gallery.appendChild(card);
             });
             lucide.createIcons();
-        }
+        };
 
-        async function performSearch(query) {
-             if (!query) {
+        const performSearch = async (query) => {
+            if (!query) {
                 showMessage('info', '请输入关键词进行搜索。');
                 return;
             }
             showMessage('loading', `正在搜索 "${query}"...`);
-            suggestionsBox.classList.add('hidden');
             try {
                 let searchUrl = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(query)}`;
-                if (state.searchType === 'name') {
-                    searchUrl += '&type=name';
-                }
+                if (state.searchType === 'name') searchUrl += '&type=name';
 
                 const response = await fetch(searchUrl);
                 if (!response.ok) throw new Error(`服务器响应错误: ${response.status}`);
@@ -268,179 +228,74 @@
                 console.error("搜索失败:", error);
                 showMessage('error', '无法连接到服务器。请检查网络或API状态。');
             }
-        }
-        
-        async function fetchSuggestions(query) {
-            if (!query || state.searchType !== 'id') {
-                suggestionsBox.classList.add('hidden');
-                return;
-            }
+        };
+
+        const fetchSuggestions = async (query) => {
+            if (!query || state.searchType !== 'id') return;
             try {
                 const response = await fetch(`${CONFIG.API_WORKER_URL}/suggest?q=${encodeURIComponent(query)}`);
                 if (!response.ok) return;
                 const data = await response.json();
                 if (data.success && data.suggestions) {
                     renderSuggestions(data.suggestions);
-                } else {
-                    suggestionsBox.classList.add('hidden');
                 }
             } catch (error) {
-                 console.error("获取建议失败:", error);
-                 suggestionsBox.classList.add('hidden');
+                console.error("获取建议失败:", error);
             }
-        }
-        
-        function renderSuggestions(suggestions) {
-             if (suggestions.length === 0) {
-                suggestionsBox.classList.add('hidden');
+        };
+
+        const renderSuggestions = (suggestions) => {
+            if (suggestions.length === 0) {
+                elements.suggestionsBox.classList.add('hidden');
                 return;
             }
-            suggestionsList.innerHTML = '';
+            elements.suggestionsList.innerHTML = '';
             suggestions.forEach(suggestion => {
                 const li = document.createElement('li');
                 li.className = 'px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors duration-150';
                 li.textContent = suggestion;
                 li.addEventListener('mousedown', (e) => {
                     e.preventDefault();
-                    searchInput.value = suggestion;
-                    suggestionsBox.classList.add('hidden');
+                    elements.searchInput.value = suggestion;
+                    elements.suggestionsBox.classList.add('hidden');
                     performSearch(suggestion);
                 });
-                suggestionsList.appendChild(li);
+                elements.suggestionsList.appendChild(li);
             });
-            suggestionsBox.classList.remove('hidden');
-        }
+            elements.suggestionsBox.classList.remove('hidden');
+        };
 
-        function openModal(cardData) {
-            state.lastFocusedElement = document.activeElement;
-
-            modalImage.src = cardData.imageUrl;
-            modalTitle.textContent = cardData.displayName;
-            modalProductName.textContent = cardData.productName;
-            modalDescription.textContent = cardData.description;
-            
-            modal.classList.remove('hidden');
-            document.body.classList.add('no-scroll');
-
-            modalCloseBtn.focus();
-        }
-
-        function closeModal() {
-            modal.classList.add('hidden');
-            document.body.classList.remove('no-scroll');
-            if (state.lastFocusedElement) {
-                state.lastFocusedElement.focus();
+        // 处理事件
+        const handleSearchInput = () => {
+            if (state.searchType === 'id' && state.isPrefixEnabled && !elements.searchInput.value.startsWith(CONFIG.DEFAULT_PREFIX)) {
+                elements.searchInput.value = CONFIG.DEFAULT_PREFIX;
             }
-        }
-
-        // --- 4. 辅助函数和UI逻辑 ---
-        
-        function updateSearchType(newType) {
-            if (state.searchType === newType) return;
-            state.searchType = newType;
-            
-            // 更新按钮样式
-            searchTypeSwitcher.querySelectorAll('.search-type-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.type === newType);
-            });
-            
-            // 清空当前内容和结果
-            searchInput.value = '';
-            performSearch('');
-
-            if (newType === 'id') {
-                searchInput.placeholder = '输入编号进行搜索...';
-                prefixToggleContainer.style.display = 'flex';
-                if (state.isPrefixEnabled) {
-                    searchInput.value = CONFIG.DEFAULT_PREFIX;
-                }
-            } else { // name search
-                searchInput.placeholder = '输入产品名称进行搜索...';
-                prefixToggleContainer.style.display = 'none';
-                suggestionsBox.classList.add('hidden');
-            }
-            updateClearButtonVisibility();
-            searchInput.focus();
-        }
-
-        function updateClearButtonVisibility() {
-            const hasValue = searchInput.value.length > 0;
-            const isJustPrefix = state.isPrefixEnabled && state.searchType === 'id' && searchInput.value === CONFIG.DEFAULT_PREFIX;
-            clearBtn.classList.toggle('hidden', !hasValue || isJustPrefix);
-        }
-
-        function handleSearchInput() {
-            if (state.searchType === 'id' && state.isPrefixEnabled && !searchInput.value.startsWith(CONFIG.DEFAULT_PREFIX)) {
-                searchInput.value = CONFIG.DEFAULT_PREFIX;
-            }
-            updateClearButtonVisibility();
             clearTimeout(state.debounceTimer);
             state.debounceTimer = setTimeout(() => {
-                const query = searchInput.value.trim();
-                const minQueryLength = (state.searchType === 'id' && state.isPrefixEnabled) ? CONFIG.DEFAULT_PREFIX.length : 0;
-                
+                const query = elements.searchInput.value.trim();
+                const minQueryLength = state.searchType === 'id' && state.isPrefixEnabled ? CONFIG.DEFAULT_PREFIX.length : 0;
                 if (query.length > minQueryLength) {
                     if (state.searchType === 'id') {
                         fetchSuggestions(query);
                     }
                 } else {
-                    suggestionsBox.classList.add('hidden');
+                    elements.suggestionsBox.classList.add('hidden');
                 }
             }, CONFIG.DEBOUNCE_DELAY);
-        }
+        };
 
-        function trapFocusInModal(e) {
-            if (e.key !== 'Tab') return;
-            const focusableElements = modalContent.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-            const firstElement = focusableElements[0];
-            const lastElement = focusableElements[focusableElements.length - 1];
-            if (e.shiftKey) { if (document.activeElement === firstElement) { lastElement.focus(); e.preventDefault(); } } 
-            else { if (document.activeElement === lastElement) { firstElement.focus(); e.preventDefault(); } }
-        }
+        // 事件监听
+        elements.searchInput.addEventListener('input', handleSearchInput);
+        elements.searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') performSearch(elements.searchInput.value.trim()); });
+        elements.clearBtn.addEventListener('click', () => { elements.searchInput.value = ''; elements.suggestionsBox.classList.add('hidden'); performSearch(''); });
 
-        // --- 5. 事件监听器设置 ---
-        
-        searchTypeSwitcher.addEventListener('click', (e) => {
-            const btn = e.target.closest('.search-type-btn');
-            if (btn && btn.dataset.type) {
-                updateSearchType(btn.dataset.type);
-            }
-        });
-
-        searchInput.addEventListener('input', handleSearchInput);
-        searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') performSearch(searchInput.value.trim()); });
-        searchInput.addEventListener('focus', () => { if (state.searchType === 'id' && state.isPrefixEnabled && searchInput.value === '') { searchInput.value = CONFIG.DEFAULT_PREFIX; updateClearButtonVisibility(); } });
-        clearBtn.addEventListener('click', () => { searchInput.value = (state.searchType === 'id' && state.isPrefixEnabled) ? CONFIG.DEFAULT_PREFIX : ''; updateClearButtonVisibility(); suggestionsBox.classList.add('hidden'); performSearch(''); searchInput.focus(); });
-        prefixToggle.addEventListener('change', () => { state.isPrefixEnabled = prefixToggle.checked; if (state.isPrefixEnabled) { if(!searchInput.value.startsWith(CONFIG.DEFAULT_PREFIX)) { searchInput.value = CONFIG.DEFAULT_PREFIX + searchInput.value; } } else { if (searchInput.value === CONFIG.DEFAULT_PREFIX) { searchInput.value = ''; } } updateClearButtonVisibility(); searchInput.focus(); });
-        document.addEventListener('click', (e) => { if (!searchContainer.contains(e.target) && !suggestionsBox.contains(e.target)) { suggestionsBox.classList.add('hidden'); } });
-        
-        gallery.addEventListener('click', (e) => {
-            const card = e.target.closest('[role="button"]');
-            if (card && card.dataset.imageUrl) {
-                openModal(card.dataset);
-            }
-        });
-        gallery.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                const card = e.target.closest('[role="button"]');
-                if (card && card.dataset.imageUrl) {
-                    openModal(card.dataset);
-                }
-            }
-        });
-
-        modalOverlay.addEventListener('click', closeModal);
-        modalCloseBtn.addEventListener('click', closeModal);
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) { closeModal(); } if (!modal.classList.contains('hidden')) { trapFocusInModal(e); } });
-
-        // --- 6. 初始化 ---
+        // 初始化
         lucide.createIcons();
         showMessage('info', '请选择搜索类型，然后输入关键词。');
         if (state.searchType === 'id' && state.isPrefixEnabled) {
-            searchInput.value = CONFIG.DEFAULT_PREFIX;
+            elements.searchInput.value = CONFIG.DEFAULT_PREFIX;
         }
     });
     </script>
 </body>
 </html>
-
