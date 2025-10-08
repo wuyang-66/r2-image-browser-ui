@@ -202,7 +202,13 @@
                 return;
             }
             images.forEach((image, index) => {
-                const imageUrl = `${CONFIG.R2_BUCKET_URL}/${image.key}`;
+                // --- 【关键修改 1/3】---
+                // 同时生成原始图片URL和经过Cloudflare优化的缩略图URL
+                const originalImageUrl = `${CONFIG.R2_BUCKET_URL}/${image.key}`;
+                const imageOptions = 'width=400,height=400,fit=cover,format=auto,quality=75';
+                // 使用你的主域名来请求优化后的图片
+                const thumbnailUrl = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/${imageOptions}/${originalImageUrl}`;
+
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 group cursor-pointer';
                 card.style.animation = `popIn 0.5s ease-out ${index * 50}ms forwards`;
@@ -210,7 +216,9 @@
                 card.setAttribute('role', 'button');
                 card.setAttribute('tabindex', '0');
                 
-                card.dataset.imageUrl = imageUrl;
+                // --- 【关键修改 2/3】---
+                // 在dataset中存储原始图片URL，用于弹窗显示大图
+                card.dataset.originalImageUrl = originalImageUrl;
                 card.dataset.displayName = image.displayName;
                 card.dataset.productName = image.productName;
                 card.dataset.description = image.description;
@@ -220,7 +228,7 @@
                         <div class="absolute inset-0 image-placeholder">
                             <i data-lucide="image" class="w-8 h-8 text-slate-300"></i>
                         </div>
-                        <img src="${imageUrl}" alt="${image.productName}" loading="lazy" 
+                        <img src="${thumbnailUrl}" alt="${image.productName}" loading="lazy" 
                              class="w-full h-full object-cover opacity-0 group-hover:scale-110 transition-all duration-500 ease-in-out">
                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                              <p class="text-white font-bold text-lg">查看详情</p>
@@ -314,7 +322,9 @@
         function openModal(cardData) {
             state.lastFocusedElement = document.activeElement;
 
-            modalImage.src = cardData.imageUrl;
+            // --- 【关键修改 3/3】---
+            // 在弹窗中加载原始的高清图片
+            modalImage.src = cardData.originalImageUrl;
             modalTitle.textContent = cardData.displayName;
             modalProductName.textContent = cardData.productName;
             modalDescription.textContent = cardData.description;
@@ -339,12 +349,10 @@
             if (state.searchType === newType) return;
             state.searchType = newType;
             
-            // 更新按钮样式
             searchTypeSwitcher.querySelectorAll('.search-type-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.type === newType);
             });
             
-            // 清空当前内容和结果
             searchInput.value = '';
             performSearch('');
 
@@ -416,14 +424,14 @@
         
         gallery.addEventListener('click', (e) => {
             const card = e.target.closest('[role="button"]');
-            if (card && card.dataset.imageUrl) {
+            if (card && card.dataset.originalImageUrl) {
                 openModal(card.dataset);
             }
         });
         gallery.addEventListener('keyup', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 const card = e.target.closest('[role="button"]');
-                if (card && card.dataset.imageUrl) {
+                if (card && card.dataset.originalImageUrl) {
                     openModal(card.dataset);
                 }
             }
