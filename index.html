@@ -86,7 +86,8 @@
             <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)]">
                 迅驰工具编号在线查询
             </h1>
-            <p class="mt-3 text-lg text-slate-500">随时随地，查看工具信息</p>
+            <!-- 【修改】给副标题加上ID，用于被JS定位和修改 -->
+            <p id="subtitle" class="mt-3 text-lg text-slate-500">随时随地，查看工具信息</p>
         </header>
 
         <div id="search-type-switcher" class="flex justify-center mb-6 space-x-2">
@@ -185,6 +186,32 @@
         const modalTitle = document.getElementById('modal-title');
         const modalProductName = document.getElementById('modal-product-name');
         const modalDescription = document.getElementById('modal-description');
+
+        // 【修改】简化后的公告获取函数
+        async function fetchAnnouncement() {
+            try {
+                const response = await fetch(`${CONFIG.API_WORKER_URL}/announcement`);
+                if (!response.ok) return;
+                const data = await response.json();
+                
+                // 检查是否有有效的、活动的公告
+                if (data && data.active && data.text) {
+                    const subtitle = document.getElementById('subtitle');
+                    // 替换副标题内容，并添加一个小图标
+                    subtitle.innerHTML = `
+                        <i data-lucide="bell" class="inline-block w-4 h-4 mr-1.5 align-middle -mt-px"></i>
+                        <span>${data.text}</span>
+                    `;
+                    // （可选）修改样式使其更醒目
+                    subtitle.classList.remove('text-slate-500');
+                    subtitle.classList.add('text-blue-600', 'font-medium');
+                    lucide.createIcons(); // 重新渲染图标
+                }
+            } catch (error)
+            {
+                console.error("获取公告失败:", error);
+            }
+        }
         
         function showMessage(type, message) {
             gallery.innerHTML = '';
@@ -261,9 +288,7 @@
             lucide.createIcons();
         }
 
-        // --- 【逻辑修正】在这里添加了 clearTimeout ---
         async function performSearch(query) {
-             // 清除可能正在等待执行的建议框获取操作，防止其在搜索后错误地弹出
             clearTimeout(state.debounceTimer);
 
              if (!query) {
@@ -271,7 +296,7 @@
                 return;
             }
             showMessage('loading', `正在搜索 "${query}"...`);
-            suggestionsBox.classList.add('hidden'); // 确保建议框被隐藏
+            suggestionsBox.classList.add('hidden');
             try {
                 let searchUrl = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(query)}`;
                 if (state.searchType === 'name') {
@@ -455,8 +480,10 @@
         modalCloseBtn.addEventListener('click', closeModal);
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) { closeModal(); } if (!modal.classList.contains('hidden')) { trapFocusInModal(e); } });
         
+        // --- 初始化 ---
         lucide.createIcons();
         showMessage('info', '请选择搜索类型，然后输入关键词。');
+        fetchAnnouncement(); // 页面加载时获取公告
         if (state.searchType === 'id' && state.isPrefixEnabled) {
             searchInput.value = CONFIG.DEFAULT_PREFIX;
         }
