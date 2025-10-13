@@ -69,6 +69,10 @@
         .search-type-btn:not(.active):hover {
             background-color: #f1f5f9; /* slate-100 */
         }
+        /* 【新增】为详情页图片添加放大鼠标指针 */
+        #modal-image {
+            cursor: zoom-in;
+        }
     </style>
 </head>
 <body class="antialiased text-slate-800">
@@ -125,6 +129,7 @@
         <div id="gallery-message" class="mt-12"></div>
     </div>
     
+    <!-- 详情弹窗 -->
     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div id="modal-overlay" class="absolute inset-0 bg-black/70 fade-in-bg" aria-hidden="true"></div>
         <div id="modal-content" class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden modal-enter">
@@ -150,6 +155,15 @@
         </div>
     </div>
 
+    <!-- 【新增】全屏图片查看器 -->
+    <div id="image-viewer" class="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 hidden transition-opacity duration-300" role="dialog" aria-modal="true">
+        <img id="viewer-image" src="" alt="全尺寸图片" class="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"/>
+        <button id="viewer-close-btn" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors" aria-label="关闭图片查看器">
+            <i data-lucide="x" class="w-10 h-10"></i>
+        </button>
+    </div>
+
+
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const CONFIG = {
@@ -165,6 +179,7 @@
             searchType: 'id'
         };
         
+        // DOM 元素获取
         const searchInput = document.getElementById('search-input');
         const clearBtn = document.getElementById('clear-btn');
         const searchBtn = document.getElementById('search-btn'); 
@@ -177,6 +192,8 @@
         const searchContainer = document.getElementById('search-container');
         const searchTypeSwitcher = document.getElementById('search-type-switcher');
         const resultsCountContainer = document.getElementById('results-count-container');
+        
+        // 详情弹窗元素
         const modal = document.getElementById('modal');
         const modalOverlay = document.getElementById('modal-overlay');
         const modalCloseBtn = document.getElementById('modal-close-btn');
@@ -185,6 +202,11 @@
         const modalTitle = document.getElementById('modal-title');
         const modalProductName = document.getElementById('modal-product-name');
         const modalDescription = document.getElementById('modal-description');
+
+        // 【新增】图片查看器元素
+        const imageViewer = document.getElementById('image-viewer');
+        const viewerImage = document.getElementById('viewer-image');
+        const viewerCloseBtn = document.getElementById('viewer-close-btn');
         
         function showMessage(type, message) {
             gallery.innerHTML = '';
@@ -261,17 +283,14 @@
             lucide.createIcons();
         }
 
-        // --- 【逻辑修正】在这里添加了 clearTimeout ---
         async function performSearch(query) {
-             // 清除可能正在等待执行的建议框获取操作，防止其在搜索后错误地弹出
             clearTimeout(state.debounceTimer);
-
-             if (!query) {
+            if (!query) {
                 showMessage('info', '请输入“编号”或“关键词”进行搜索。');
                 return;
             }
             showMessage('loading', `正在搜索 "${query}"...`);
-            suggestionsBox.classList.add('hidden'); // 确保建议框被隐藏
+            suggestionsBox.classList.add('hidden');
             try {
                 let searchUrl = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(query)}`;
                 if (state.searchType === 'name') {
@@ -336,7 +355,7 @@
 
         function openModal(cardData) {
             state.lastFocusedElement = document.activeElement;
-            modalImage.src = cardData.originalImageUrl;
+            modalImage.src = cardData.originalImageUrl; // 这里加载的是原图
             modalTitle.textContent = cardData.displayName;
             modalProductName.textContent = cardData.productName;
             modalDescription.textContent = cardData.description;
@@ -352,6 +371,23 @@
             if (state.lastFocusedElement) {
                 state.lastFocusedElement.focus();
             }
+        }
+
+        // 【新增】打开图片查看器
+        function openImageViewer(imageUrl) {
+            viewerImage.src = imageUrl;
+            imageViewer.classList.remove('hidden');
+            imageViewer.style.opacity = '0';
+            setTimeout(() => imageViewer.style.opacity = '1', 10);
+        }
+
+        // 【新增】关闭图片查看器
+        function closeImageViewer() {
+            imageViewer.style.opacity = '0';
+            setTimeout(() => {
+                imageViewer.classList.add('hidden');
+                viewerImage.src = ''; // 清空src，避免下次打开时闪现旧图
+            }, 300);
         }
 
         function updateSearchType(newType) {
@@ -414,6 +450,8 @@
             else { if (document.activeElement === lastElement) { firstElement.focus(); e.preventDefault(); } }
         }
         
+        // --- 事件监听器 ---
+
         searchTypeSwitcher.addEventListener('click', (e) => {
             const btn = e.target.closest('.search-type-btn');
             if (btn && btn.dataset.type) {
@@ -421,10 +459,7 @@
             }
         });
 
-        searchBtn.addEventListener('click', () => {
-            performSearch(searchInput.value.trim());
-        });
-
+        searchBtn.addEventListener('click', () => performSearch(searchInput.value.trim()));
         searchInput.addEventListener('input', handleSearchInput);
         searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') performSearch(searchInput.value.trim()); });
         searchInput.addEventListener('focus', () => { if (state.searchType === 'id' && state.isPrefixEnabled && searchInput.value === '') { searchInput.value = CONFIG.DEFAULT_PREFIX; updateClearButtonVisibility(); } });
@@ -453,8 +488,39 @@
         
         modalOverlay.addEventListener('click', closeModal);
         modalCloseBtn.addEventListener('click', closeModal);
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) { closeModal(); } if (!modal.classList.contains('hidden')) { trapFocusInModal(e); } });
+
+        // 【新增】为详情图片添加点击事件，以打开查看器
+        modalImage.addEventListener('click', () => {
+            if (modalImage.src) {
+                openImageViewer(modalImage.src);
+            }
+        });
+
+        // 【新增】图片查看器的关闭事件
+        viewerCloseBtn.addEventListener('click', closeImageViewer);
+        imageViewer.addEventListener('click', (e) => {
+            // 点击背景（而不是图片本身）时关闭
+            if (e.target === imageViewer) {
+                closeImageViewer();
+            }
+        });
+
+        // 【修改】全局键盘事件，优先处理最上层的弹窗
+        document.addEventListener('keydown', (e) => { 
+            if (e.key === 'Escape') {
+                if (!imageViewer.classList.contains('hidden')) {
+                    closeImageViewer(); // 优先关闭图片查看器
+                } else if (!modal.classList.contains('hidden')) {
+                    closeModal(); // 其次关闭详情弹窗
+                }
+            } 
+            // 确保焦点陷阱只在详情弹窗激活且图片查看器关闭时生效
+            if (!modal.classList.contains('hidden') && imageViewer.classList.contains('hidden')) { 
+                trapFocusInModal(e); 
+            } 
+        });
         
+        // 初始化
         lucide.createIcons();
         showMessage('info', '请选择搜索类型，然后输入关键词。');
         if (state.searchType === 'id' && state.isPrefixEnabled) {
