@@ -3,193 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>迅驰工具在线查询 - 增强版</title>
+    <title>迅驰工具在线查询</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Lucide 图标库 -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
-            --brand-primary: #3b82f6;
-            --brand-secondary: #14b8a6;
+            --brand-color-from: #3b82f6; /* blue-500 */
+            --brand-color-to: #14b8a6;   /* teal-500 */
         }
         body {
-            font-family: 'Noto Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: #f8fafc;
-            /* 添加细腻的背景纹理 */
-            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
-            background-size: 24px 24px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+            background-color: #f8fafc; /* slate-50 */
+        }
+        /* 动画效果 */
+        @keyframes modal-in { from { opacity: 0; transform: scale(0.95) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .modal-enter { animation: modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .fade-in-bg { animation: fade-in 0.3s ease-out forwards; }
+        .no-scroll { overflow: hidden; }
+
+        /* 图片加载占位符 */
+        .image-placeholder {
+            background-color: #e2e8f0; /* slate-200 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
         }
         
-        /* 自定义滚动条 */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-
-        /* 动画类 */
-        .fade-in-up { animation: fadeInUp 0.5s ease-out forwards; opacity: 0; transform: translateY(20px); }
-        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
-        
-        /* 骨架屏动画 */
-        .skeleton {
-            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
+        /* 自定义Toggle开关 */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: var(--brand-color-from);
         }
-        @keyframes shimmer { 100% { background-position: -200% 0; } }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: var(--brand-color-from);
+        }
 
-        /* 自定义 Toggle 开关样式 */
-        .toggle-checkbox:checked { right: 0; border-color: #3b82f6; }
-        .toggle-checkbox:checked + .toggle-label { background-color: #3b82f6; }
-        
-        /* 图片查看器光标 */
-        #modal-image { cursor: zoom-in; }
-        
-        /* 搜索框聚焦时的光晕效果 */
-        .search-focus-ring:focus-within {
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            border-color: #60a5fa;
+        /* 隐藏浏览器默认的搜索框清除按钮 */
+        input[type="search"]::-webkit-search-decoration,
+        input[type="search"]::-webkit-search-cancel-button,
+        input[type="search"]::-webkit-search-results-button,
+        input[type="search"]::-webkit-search-results-decoration {
+            -webkit-appearance: none;
+        }
+
+        /* 搜索类型切换按钮 */
+        .search-type-btn {
+            padding: 8px 16px;
+            border-radius: 9999px;
+            border: 1px solid #cbd5e1; /* slate-300 */
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            font-weight: 500;
+            background-color: white;
+            color: #475569; /* slate-600 */
+        }
+        .search-type-btn.active {
+            background-color: var(--brand-color-from);
+            color: white;
+            border-color: var(--brand-color-from);
+        }
+        .search-type-btn:not(.active):hover {
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        /* 【新增】为详情页图片添加放大鼠标指针 */
+        #modal-image {
+            cursor: zoom-in;
         }
     </style>
 </head>
-<body class="antialiased text-slate-800 min-h-screen flex flex-col">
+<body class="antialiased text-slate-800">
 
-    <!-- 顶部装饰条 -->
-    <div class="h-1.5 w-full bg-gradient-to-r from-blue-500 via-teal-400 to-blue-500"></div>
+    <div id="prefix-toggle-container" class="absolute top-4 right-4 z-20 flex items-center">
+        <label for="prefix-toggle" class="text-sm text-slate-600 mr-3 cursor-pointer">自动添加 "XC" 前缀</label>
+        <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+            <input type="checkbox" name="prefix-toggle" id="prefix-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" checked/>
+            <label for="prefix-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+        </div>
+    </div>
 
-    <div class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
-        
-        <!-- 头部区域 -->
-        <header class="text-center mb-10 fade-in-up" style="animation-delay: 0.1s;">
-            <div class="inline-flex items-center justify-center p-3 bg-blue-50 rounded-2xl mb-4 shadow-sm">
-                <i data-lucide="search" class="w-6 h-6 text-blue-500 mr-2"></i>
-                <span class="text-blue-600 font-bold tracking-wide">XC TOOLS QUERY</span>
-            </div>
-            <h1 class="text-4xl md:text-6xl font-black text-slate-800 tracking-tight mb-2">
-                工具编号<span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-teal-500">在线查询</span>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        <header class="text-center mb-8 md:mb-12 pt-8">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)]">
+                迅驰工具编号在线查询
             </h1>
-            <p class="mt-4 text-lg text-slate-500 max-w-2xl mx-auto">快速检索迅驰工具详细信息，支持编号与名称模糊搜索。</p>
+            <p class="mt-3 text-lg text-slate-500">随时随地，查看工具信息</p>
         </header>
 
-        <!-- 搜索控制区 -->
-        <div class="max-w-3xl mx-auto mb-12 fade-in-up" style="animation-delay: 0.2s;">
+        <div id="search-type-switcher" class="flex justify-center mb-6 space-x-2">
+            <button data-type="id" class="search-type-btn active">按编号搜索</button>
+            <button data-type="name" class="search-type-btn">按名称/关键词搜索</button>
+        </div>
+
+        <div class="max-w-3xl mx-auto flex items-center space-x-2">
+            <div class="relative flex-grow" id="search-container">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <i data-lucide="search" class="w-5 h-5 text-slate-400"></i>
+                </div>
+                <input type="search" id="search-input" placeholder="输入编号进行搜索..."
+                       aria-label="搜索工具"
+                       class="w-full pl-12 pr-10 py-3 text-base border-2 border-slate-200 rounded-full shadow-sm 
+                              focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none
+                              transition-all duration-300 ease-in-out"
+                       autocomplete="off">
+                <button id="clear-btn" class="absolute inset-y-0 right-0 pr-4 flex items-center cursor-pointer hidden" aria-label="清空搜索框">
+                    <i data-lucide="x-circle" class="w-5 h-5 text-slate-400 hover:text-slate-600"></i>
+                </button>
+                
+                <div id="suggestions-box" class="absolute z-40 w-full mt-2 bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden hidden">
+                    <ul id="suggestions-list"></ul>
+                </div>
+            </div>
             
-            <!-- 搜索类型切换 Tabs -->
-            <div class="flex justify-center mb-6">
-                <div class="bg-white p-1 rounded-full shadow-sm border border-slate-200 inline-flex" id="search-type-switcher">
-                    <button data-type="id" class="px-6 py-2 rounded-full text-sm font-semibold transition-all duration-200 active-tab bg-blue-500 text-white shadow-md">
-                        <i data-lucide="hash" class="w-4 h-4 inline mr-1"></i>按编号
-                    </button>
-                    <button data-type="name" class="px-6 py-2 rounded-full text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-all duration-200">
-                        <i data-lucide="type" class="w-4 h-4 inline mr-1"></i>按名称
-                    </button>
-                </div>
-            </div>
-
-            <!-- 搜索框主体 -->
-            <div class="relative z-30">
-                <div class="relative flex items-center bg-white rounded-full shadow-lg border border-slate-200 search-focus-ring transition-all duration-300 group" id="search-container">
-                    <div class="pl-6 text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                        <i data-lucide="search" class="w-6 h-6"></i>
-                    </div>
-                    <input type="search" id="search-input" 
-                           placeholder="输入编号 (例如: 1234)..."
-                           class="w-full bg-transparent border-none focus:ring-0 text-lg py-4 px-4 text-slate-700 placeholder-slate-400 outline-none"
-                           autocomplete="off">
-                    
-                    <!-- 清除按钮 -->
-                    <button id="clear-btn" class="hidden p-2 mr-2 text-slate-300 hover:text-slate-500 transition-colors" aria-label="清空">
-                        <i data-lucide="x-circle" class="w-5 h-5"></i>
-                    </button>
-
-                    <!-- 搜索按钮 -->
-                    <div class="p-1.5">
-                        <button id="search-btn" class="bg-gradient-to-r from-blue-500 to-teal-500 text-white px-8 py-3 rounded-full font-bold shadow-md hover:shadow-lg hover:opacity-95 transition-all active:scale-95 flex items-center">
-                            搜索
-                        </button>
-                    </div>
-
-                    <!-- 搜索建议下拉 -->
-                    <div id="suggestions-box" class="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden hidden divide-y divide-slate-50">
-                        <ul id="suggestions-list" class="max-h-64 overflow-y-auto"></ul>
-                    </div>
-                </div>
-
-                <!-- 附加选项：前缀开关 -->
-                <div id="prefix-toggle-wrapper" class="flex items-center justify-end mt-3 px-4 transition-opacity duration-300">
-                    <label for="prefix-toggle" class="text-sm text-slate-500 mr-3 cursor-pointer select-none">自动添加 "XC" 前缀</label>
-                    <div class="relative inline-block w-10 mr-2 align-middle select-none">
-                        <input type="checkbox" id="prefix-toggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer transition-all duration-300" checked style="top: 2px; left: 2px;"/>
-                        <label for="prefix-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-200 cursor-pointer transition-colors duration-300"></label>
-                    </div>
-                </div>
-            </div>
+            <button id="search-btn" class="flex-shrink-0 px-5 py-3 font-semibold text-white bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)] rounded-full shadow-sm hover:opacity-90 transition-opacity" aria-label="执行搜索">
+                <span>搜索</span>
+            </button>
         </div>
         
-        <!-- 结果统计与展示 -->
-        <div id="results-area" class="fade-in-up" style="animation-delay: 0.3s;">
-            <div id="results-count-container" class="mb-6 px-2 hidden"></div>
-            
-            <!-- 网格布局 -->
-            <main id="gallery" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 xl:gap-8"></main>
-            
-            <!-- 状态提示区 -->
-            <div id="gallery-message" class="mt-12 text-center"></div>
-        </div>
-    </div>
+        <div id="results-count-container" class="max-w-3xl mx-auto mt-6 hidden"></div>
 
-    <footer class="py-6 text-center text-slate-400 text-sm border-t border-slate-200 bg-white/50">
-        <p>&copy; 2024 迅驰工具 · XC Tools Query System</p>
-    </footer>
-    
-    <!-- ================= 模态窗 ================= -->
+        <main id="gallery" class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></main>
+        <div id="gallery-message" class="mt-12"></div>
+    </div>
     
     <!-- 详情弹窗 -->
-    <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
-        <!-- 背景遮罩 -->
-        <div id="modal-overlay" class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300" aria-hidden="true"></div>
-        
-        <!-- 内容卡片 -->
-        <div id="modal-content" class="relative z-10 bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden transform transition-all duration-300 scale-95 opacity-0">
-            <!-- 图片区 -->
-            <div class="w-full md:w-3/5 bg-slate-50 flex items-center justify-center p-6 relative group">
-                <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiNjYmQ1ZTEiIGZpbGwtb3BhY2l0eT0iMC40Ii8+PC9zdmc+')] opacity-50"></div>
-                <button id="modal-close-btn" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700 bg-white/80 hover:bg-white rounded-full p-2 shadow-sm backdrop-blur-sm transition-all z-20">
-                    <i data-lucide="x" class="w-6 h-6"></i>
+    <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div id="modal-overlay" class="absolute inset-0 bg-black/70 fade-in-bg" aria-hidden="true"></div>
+        <div id="modal-content" class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden modal-enter">
+            <div class="w-full md:w-3/5 bg-slate-100 flex items-center justify-center p-4 relative">
+                <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-20 bg-white/50 rounded-full p-1" aria-label="关闭弹窗">
+                    <i data-lucide="x" class="w-7 h-7"></i>
                 </button>
-                <img id="modal-image" src="" alt="详情" class="relative z-10 max-w-full max-h-[40vh] md:max-h-[70vh] object-contain drop-shadow-xl transition-transform duration-300 group-hover:scale-105">
-                <div class="absolute bottom-4 text-xs text-slate-400 flex items-center bg-white/60 px-3 py-1 rounded-full backdrop-blur-sm">
-                    <i data-lucide="zoom-in" class="w-3 h-3 mr-1"></i> 点击查看大图
-                </div>
+                <img id="modal-image" src="" alt="详情图片" class="max-w-full max-h-[40vh] md:max-h-[80vh] object-contain">
             </div>
-            
-            <!-- 信息区 -->
-            <div class="w-full md:w-2/5 p-8 overflow-y-auto flex flex-col justify-center bg-white">
-                <h2 id="modal-title" class="text-3xl font-bold text-slate-800 mb-1 leading-tight"></h2>
-                <div class="w-12 h-1 bg-blue-500 rounded-full mb-6"></div>
-                
-                <div class="space-y-6">
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">产品名称</h3>
-                        <p id="modal-product-name" class="text-lg font-semibold text-slate-700"></p>
+            <div class="w-full md:w-2/5 p-8 overflow-y-auto">
+                <h2 id="modal-title" class="text-3xl font-bold text-slate-800"></h2>
+                <div class="mt-6 space-y-4 text-slate-600">
+                    <div>
+                        <h3 class="font-semibold text-slate-800">产品名称</h3>
+                        <p id="modal-product-name"></p>
                     </div>
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">功能用途</h3>
-                        <p id="modal-description" class="text-slate-600 leading-relaxed"></p>
+                    <div>
+                        <h3 class="font-semibold text-slate-800">功能用途</h3>
+                        <p id="modal-description"></p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 全屏图片查看器 -->
-    <div id="image-viewer" class="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
-        <img id="viewer-image" src="" class="max-w-screen max-h-screen object-contain transition-transform duration-300 scale-95"/>
-        <button id="viewer-close-btn" class="absolute top-6 right-6 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all">
-            <i data-lucide="x" class="w-8 h-8"></i>
+    <!-- 【新增】全屏图片查看器 -->
+    <div id="image-viewer" class="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 hidden transition-opacity duration-300" role="dialog" aria-modal="true">
+        <img id="viewer-image" src="" alt="全尺寸图片" class="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"/>
+        <button id="viewer-close-btn" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors" aria-label="关闭图片查看器">
+            <i data-lucide="x" class="w-10 h-10"></i>
         </button>
-        <div class="absolute bottom-6 text-white/50 text-sm">按 ESC 关闭</div>
     </div>
+
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -199,383 +172,360 @@
             DEBOUNCE_DELAY: 300,
             DEFAULT_PREFIX: "XC"
         };
-        
         const state = { 
             debounceTimer: null, 
             isPrefixEnabled: true, 
+            lastFocusedElement: null,
             searchType: 'id'
         };
         
-        // DOM 元素
-        const els = {
-            input: document.getElementById('search-input'),
-            clearBtn: document.getElementById('clear-btn'),
-            searchBtn: document.getElementById('search-btn'),
-            prefixToggle: document.getElementById('prefix-toggle'),
-            prefixWrapper: document.getElementById('prefix-toggle-wrapper'),
-            gallery: document.getElementById('gallery'),
-            message: document.getElementById('gallery-message'),
-            suggestions: {
-                box: document.getElementById('suggestions-box'),
-                list: document.getElementById('suggestions-list')
-            },
-            switcher: document.getElementById('search-type-switcher'),
-            resultsCount: document.getElementById('results-count-container'),
-            modal: {
-                self: document.getElementById('modal'),
-                overlay: document.getElementById('modal-overlay'),
-                content: document.getElementById('modal-content'),
-                close: document.getElementById('modal-close-btn'),
-                image: document.getElementById('modal-image'),
-                title: document.getElementById('modal-title'),
-                name: document.getElementById('modal-product-name'),
-                desc: document.getElementById('modal-description')
-            },
-            viewer: {
-                self: document.getElementById('image-viewer'),
-                img: document.getElementById('viewer-image'),
-                close: document.getElementById('viewer-close-btn')
-            }
-        };
+        // DOM 元素获取
+        const searchInput = document.getElementById('search-input');
+        const clearBtn = document.getElementById('clear-btn');
+        const searchBtn = document.getElementById('search-btn'); 
+        const prefixToggle = document.getElementById('prefix-toggle');
+        const prefixToggleContainer = document.getElementById('prefix-toggle-container');
+        const gallery = document.getElementById('gallery');
+        const galleryMessage = document.getElementById('gallery-message');
+        const suggestionsBox = document.getElementById('suggestions-box');
+        const suggestionsList = document.getElementById('suggestions-list');
+        const searchContainer = document.getElementById('search-container');
+        const searchTypeSwitcher = document.getElementById('search-type-switcher');
+        const resultsCountContainer = document.getElementById('results-count-container');
+        
+        // 详情弹窗元素
+        const modal = document.getElementById('modal');
+        const modalOverlay = document.getElementById('modal-overlay');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+        const modalContent = document.getElementById('modal-content');
+        const modalImage = document.getElementById('modal-image');
+        const modalTitle = document.getElementById('modal-title');
+        const modalProductName = document.getElementById('modal-product-name');
+        const modalDescription = document.getElementById('modal-description');
 
-        // --- 核心功能函数 ---
+        // 【新增】图片查看器元素
+        const imageViewer = document.getElementById('image-viewer');
+        const viewerImage = document.getElementById('viewer-image');
+        const viewerCloseBtn = document.getElementById('viewer-close-btn');
+        
+        function showMessage(type, message) {
+            gallery.innerHTML = '';
+            resultsCountContainer.classList.add('hidden');
+            resultsCountContainer.innerHTML = '';
 
-        // 显示不同状态的信息
-        function showState(type, text) {
-            els.gallery.innerHTML = '';
-            els.resultsCount.classList.add('hidden');
-            
-            let content = '';
-            if (type === 'loading') {
-                // 渲染8个骨架屏作为加载占位
-                els.gallery.innerHTML = Array(8).fill(0).map(() => `
-                    <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100">
-                        <div class="aspect-square skeleton"></div>
-                        <div class="p-4 space-y-3">
-                            <div class="h-4 bg-slate-100 rounded w-3/4 skeleton"></div>
-                            <div class="h-3 bg-slate-100 rounded w-1/2 skeleton"></div>
-                        </div>
-                    </div>
-                `).join('');
-                els.message.innerHTML = ''; // 加载时不显示文字，只显示骨架屏
-                return;
-            } 
-            
-            if (type === 'info') {
-                content = `
-                    <div class="flex flex-col items-center justify-center py-12">
-                        <div class="bg-blue-50 p-6 rounded-full mb-4">
-                            <i data-lucide="search" class="w-12 h-12 text-blue-400"></i>
-                        </div>
-                        <h3 class="text-lg font-medium text-slate-600">开始搜索</h3>
-                        <p class="text-slate-400 mt-1">${text}</p>
-                    </div>`;
-            } else if (type === 'empty') {
-                content = `
-                    <div class="flex flex-col items-center justify-center py-12">
-                        <div class="bg-slate-100 p-6 rounded-full mb-4">
-                            <i data-lucide="folder-open" class="w-12 h-12 text-slate-400"></i>
-                        </div>
-                        <h3 class="text-lg font-medium text-slate-600">没有找到结果</h3>
-                        <p class="text-slate-400 mt-1">换个关键词试试看？</p>
-                    </div>`;
-            } else if (type === 'error') {
-                content = `
-                    <div class="flex flex-col items-center justify-center py-12 text-red-500">
-                        <i data-lucide="alert-circle" class="w-12 h-12 mb-3"></i>
-                        <p>${text}</p>
-                    </div>`;
-            }
-            els.message.innerHTML = content;
+            let icon = '';
+            const iconClasses = "w-12 h-12";
+            if (type === 'loading') icon = `<i data-lucide="loader-2" class="${iconClasses} animate-spin text-blue-500"></i>`;
+            else if (type === 'info') icon = `<i data-lucide="search" class="${iconClasses} text-slate-400"></i>`;
+            else if (type === 'error') icon = `<i data-lucide="alert-triangle" class="${iconClasses} text-red-500"></i>`;
+            galleryMessage.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[30vh] text-slate-500">${icon}<p class="mt-4 text-lg text-center">${message}</p></div>`;
             lucide.createIcons();
         }
-
-        // 渲染搜索结果卡片
+        
         function renderGallery(images) {
-            els.message.innerHTML = '';
-            els.gallery.innerHTML = '';
-
-            if (!images || images.length === 0) {
-                showState('empty');
+            galleryMessage.innerHTML = '';
+            gallery.innerHTML = '';
+            
+            if (images.length === 0) {
+                showMessage('info', '未找到符合条件的结果。');
                 return;
             }
 
-            // 显示结果数量
-            els.resultsCount.classList.remove('hidden');
-            els.resultsCount.innerHTML = `
-                <span class="inline-flex items-center px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-sm font-medium border border-teal-100">
-                    <i data-lucide="check-circle-2" class="w-4 h-4 mr-1.5"></i>
-                    找到 ${images.length} 个结果
-                </span>
+            resultsCountContainer.innerHTML = `
+                <div class="flex items-center text-sm text-slate-500 font-medium">
+                    <i data-lucide="check-circle-2" class="w-5 h-5 mr-2 text-teal-500"></i>
+                    <span>为您找到 ${images.length} 个相关结果</span>
+                </div>
             `;
+            resultsCountContainer.classList.remove('hidden');
 
-            // 生成卡片 HTML
-            const html = images.map((img, idx) => {
-                const originalUrl = `${CONFIG.R2_BUCKET_URL}/${img.key}`;
-                const thumbUrl = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=400,height=400,fit=cover,format=auto,quality=80/${originalUrl}`;
-                // 简单的转义处理，防止破坏HTML结构
-                const safeName = img.productName.replace(/"/g, '&quot;'); 
+            images.forEach((image, index) => {
+                const originalImageUrl = `${CONFIG.R2_BUCKET_URL}/${image.key}`;
+                const imageOptions = 'width=400,height=400,fit=cover,format=auto,quality=75';
+                const thumbnailUrl = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/${imageOptions}/${originalImageUrl}`;
+
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 group cursor-pointer';
+                card.style.animation = `popIn 0.5s ease-out ${index * 50}ms forwards`;
+                card.style.opacity = '0';
+                card.setAttribute('role', 'button');
+                card.setAttribute('tabindex', '0');
                 
-                return `
-                <div class="group bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_24px_rgba(0,0,0,0.08)] border border-slate-100 transition-all duration-300 hover:-translate-y-1 cursor-pointer fade-in-up" 
-                     style="animation-delay: ${idx * 50}ms"
-                     role="button"
-                     data-original="${originalUrl}"
-                     data-title="${img.displayName}"
-                     data-name="${safeName}"
-                     data-desc="${img.description.replace(/"/g, '&quot;')}"
-                     onclick="window.openModal(this.dataset)">
-                    
-                    <div class="relative aspect-square overflow-hidden bg-slate-100">
-                        <img src="${thumbUrl}" 
-                             alt="${safeName}" 
-                             loading="lazy"
-                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                             onload="this.parentElement.classList.remove('bg-slate-100')"
-                             onerror="this.src='https://placehold.co/400x400?text=No+Image'">
-                        
-                        <!-- 悬停遮罩 -->
-                        <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[1px]">
-                            <span class="bg-white/90 text-slate-800 px-4 py-2 rounded-full text-sm font-bold shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                                查看详情
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <div class="p-4">
-                        <h3 class="text-base font-bold text-slate-700 truncate mb-1" title="${safeName}">${safeName}</h3>
-                        <div class="flex items-center justify-between">
-                            <p class="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">${img.displayName}</p>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
+                card.dataset.originalImageUrl = originalImageUrl;
+                card.dataset.displayName = image.displayName;
+                card.dataset.productName = image.productName;
+                card.dataset.description = image.description;
 
-            els.gallery.innerHTML = html;
+                card.innerHTML = `
+                    <div class="relative overflow-hidden aspect-square">
+                        <div class="absolute inset-0 image-placeholder">
+                            <i data-lucide="image" class="w-8 h-8 text-slate-300"></i>
+                        </div>
+                        <img src="${thumbnailUrl}" alt="${image.productName}" loading="lazy" 
+                             class="w-full h-full object-cover opacity-0 group-hover:scale-110 transition-all duration-500 ease-in-out">
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                             <p class="text-white font-bold text-lg">查看详情</p>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-slate-50">
+                        <p class="text-sm font-semibold text-slate-600 text-center truncate" title="${image.productName}">${image.productName}</p>
+                        <p class="text-xs text-slate-400 text-center mt-1">${image.displayName}</p>
+                    </div>
+                `;
+                
+                const imgElement = card.querySelector('img');
+                const placeholder = card.querySelector('.image-placeholder');
+                imgElement.onload = () => { placeholder.style.display = 'none'; imgElement.style.opacity = '1'; };
+                imgElement.onerror = () => { placeholder.innerHTML = '<i data-lucide="image-off" class="w-8 h-8 text-slate-400"></i>'; lucide.createIcons(); };
+
+                gallery.appendChild(card);
+            });
             lucide.createIcons();
         }
 
-        // 执行搜索
         async function performSearch(query) {
             clearTimeout(state.debounceTimer);
             if (!query) {
-                showState('info', '请输入内容开始搜索');
+                showMessage('info', '请输入“编号”或“关键词”进行搜索。');
                 return;
             }
-
-            showState('loading');
-            els.suggestions.box.classList.add('hidden');
-
+            showMessage('loading', `正在搜索 "${query}"...`);
+            suggestionsBox.classList.add('hidden');
             try {
-                let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(query)}`;
-                if (state.searchType === 'name') url += '&type=name';
+                let searchUrl = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(query)}`;
+                if (state.searchType === 'name') {
+                    searchUrl += '&type=name';
+                }
 
-                const res = await fetch(url);
-                if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
-                const data = await res.json();
-                
-                if (data.success) {
+                const response = await fetch(searchUrl);
+                if (!response.ok) throw new Error(`服务器响应错误: ${response.status}`);
+                const data = await response.json();
+                if (data.success && data.images) {
                     renderGallery(data.images);
                 } else {
-                    showState('error', data.error || '服务未返回数据');
+                    showMessage('error', data.error || '未能获取结果。');
                 }
-            } catch (err) {
-                console.error(err);
-                showState('error', '网络连接失败，请稍后重试');
+            } catch (error) {
+                console.error("搜索失败:", error);
+                showMessage('error', '无法连接到服务器。请检查网络或API状态。');
             }
         }
-
-        // 获取建议
+        
         async function fetchSuggestions(query) {
             if (!query || state.searchType !== 'id') {
-                els.suggestions.box.classList.add('hidden');
+                suggestionsBox.classList.add('hidden');
                 return;
             }
             try {
-                const res = await fetch(`${CONFIG.API_WORKER_URL}/suggest?q=${encodeURIComponent(query)}`);
-                const data = await res.json();
-                if (data.success && data.suggestions.length > 0) {
+                const response = await fetch(`${CONFIG.API_WORKER_URL}/suggest?q=${encodeURIComponent(query)}`, { mode: 'cors' });
+                if (!response.ok) {
+                    throw new Error(`服务器响应错误，状态码: ${response.status}`);
+                }
+                const data = await response.json();
+                if (data.success && data.suggestions) {
                     renderSuggestions(data.suggestions);
                 } else {
-                    els.suggestions.box.classList.add('hidden');
+                    suggestionsBox.classList.add('hidden');
                 }
-            } catch (e) { console.error(e); }
+            } catch (error) {
+                 console.error("获取建议失败:", error);
+            }
+        }
+        
+        function renderSuggestions(suggestions) {
+             if (suggestions.length === 0) {
+                suggestionsBox.classList.add('hidden');
+                return;
+            }
+            suggestionsList.innerHTML = '';
+            suggestions.forEach(suggestion => {
+                const li = document.createElement('li');
+                li.className = 'px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors duration-150';
+                li.textContent = suggestion;
+                li.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    searchInput.value = suggestion;
+                    suggestionsBox.classList.add('hidden');
+                    performSearch(suggestion);
+                });
+                suggestionsList.appendChild(li);
+            });
+            suggestionsBox.classList.remove('hidden');
         }
 
-        function renderSuggestions(list) {
-            els.suggestions.list.innerHTML = list.map(item => `
-                <li class="px-5 py-3 cursor-pointer hover:bg-blue-50 text-slate-600 hover:text-blue-600 transition-colors flex items-center"
-                    onclick="selectSuggestion('${item}')">
-                    <i data-lucide="search" class="w-4 h-4 mr-3 opacity-50"></i>
-                    ${item}
-                </li>
-            `).join('');
-            lucide.createIcons();
-            els.suggestions.box.classList.remove('hidden');
-        }
-
-        // --- 交互逻辑 ---
-
-        window.selectSuggestion = (val) => {
-            els.input.value = val;
-            els.suggestions.box.classList.add('hidden');
-            performSearch(val);
-        };
-
-        // 模态窗逻辑
-        window.openModal = (data) => {
-            const { original, title, name, desc } = data;
-            els.modal.image.src = original;
-            els.modal.title.textContent = title;
-            els.modal.name.textContent = name;
-            els.modal.desc.textContent = desc;
+        function openModal(cardData) {
+            state.lastFocusedElement = document.activeElement;
+            modalImage.src = cardData.originalImageUrl; // 这里加载的是原图
+            modalTitle.textContent = cardData.displayName;
+            modalProductName.textContent = cardData.productName;
+            modalDescription.textContent = cardData.description;
             
-            els.modal.self.classList.remove('hidden');
-            // 动画类
-            setTimeout(() => {
-                els.modal.content.classList.remove('scale-95', 'opacity-0');
-                els.modal.content.classList.add('scale-100', 'opacity-100');
-            }, 10);
-            document.body.style.overflow = 'hidden';
-        };
+            modal.classList.remove('hidden');
+            document.body.classList.add('no-scroll');
+            modalCloseBtn.focus();
+        }
 
         function closeModal() {
-            els.modal.content.classList.remove('scale-100', 'opacity-100');
-            els.modal.content.classList.add('scale-95', 'opacity-0');
+            modal.classList.add('hidden');
+            document.body.classList.remove('no-scroll');
+            if (state.lastFocusedElement) {
+                state.lastFocusedElement.focus();
+            }
+        }
+
+        // 【新增】打开图片查看器
+        function openImageViewer(imageUrl) {
+            viewerImage.src = imageUrl;
+            imageViewer.classList.remove('hidden');
+            imageViewer.style.opacity = '0';
+            setTimeout(() => imageViewer.style.opacity = '1', 10);
+        }
+
+        // 【新增】关闭图片查看器
+        function closeImageViewer() {
+            imageViewer.style.opacity = '0';
             setTimeout(() => {
-                els.modal.self.classList.add('hidden');
-                document.body.style.overflow = '';
-                els.modal.image.src = ''; // 清理资源
+                imageViewer.classList.add('hidden');
+                viewerImage.src = ''; // 清空src，避免下次打开时闪现旧图
             }, 300);
         }
 
-        // 图片查看器逻辑
-        function openViewer(src) {
-            els.viewer.img.src = src;
-            els.viewer.self.classList.remove('hidden');
-            setTimeout(() => {
-                els.viewer.self.classList.remove('opacity-0');
-                els.viewer.img.classList.remove('scale-95');
-                els.viewer.img.classList.add('scale-100');
-            }, 10);
-        }
-
-        function closeViewer() {
-            els.viewer.self.classList.add('opacity-0');
-            els.viewer.img.classList.remove('scale-100');
-            els.viewer.img.classList.add('scale-95');
-            setTimeout(() => {
-                els.viewer.self.classList.add('hidden');
-                els.viewer.img.src = '';
-            }, 300);
-        }
-
-        // --- 事件绑定 ---
-
-        // 搜索类型切换
-        els.switcher.addEventListener('click', (e) => {
-            const btn = e.target.closest('button');
-            if (!btn) return;
+        function updateSearchType(newType) {
+            if (state.searchType === newType) return;
+            state.searchType = newType;
             
-            const type = btn.dataset.type;
-            state.searchType = type;
-            
-            // 样式切换
-            const btns = els.switcher.querySelectorAll('button');
-            btns.forEach(b => {
-                if(b === btn) {
-                    b.classList.add('bg-blue-500', 'text-white', 'shadow-md');
-                    b.classList.remove('text-slate-600', 'hover:bg-slate-100');
-                } else {
-                    b.classList.remove('bg-blue-500', 'text-white', 'shadow-md');
-                    b.classList.add('text-slate-600', 'hover:bg-slate-100');
-                }
+            searchTypeSwitcher.querySelectorAll('.search-type-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.type === newType);
             });
+            searchInput.value = '';
+            performSearch('');
 
-            // 逻辑重置
-            els.input.value = '';
-            if (type === 'id') {
-                els.input.placeholder = '输入编号 (例如: 1234)...';
-                els.prefixWrapper.style.display = 'flex';
-                if (state.isPrefixEnabled) els.input.value = CONFIG.DEFAULT_PREFIX;
+            if (newType === 'id') {
+                searchInput.placeholder = '输入编号进行搜索...';
+                prefixToggleContainer.style.display = 'flex';
+                if (state.isPrefixEnabled) {
+                    searchInput.value = CONFIG.DEFAULT_PREFIX;
+                }
             } else {
-                els.input.placeholder = '输入产品关键词...';
-                els.prefixWrapper.style.display = 'none';
-                els.suggestions.box.classList.add('hidden');
+                searchInput.placeholder = '输入产品名称关键词进行搜索...';
+                prefixToggleContainer.style.display = 'none';
+                suggestionsBox.classList.add('hidden');
             }
-            els.clearBtn.classList.add('hidden');
-            els.input.focus();
-        });
+            updateClearButtonVisibility();
+            searchInput.focus();
+        }
 
-        // 输入框事件
-        els.input.addEventListener('input', () => {
-            const val = els.input.value;
-            
-            // 前缀逻辑
-            if (state.searchType === 'id' && state.isPrefixEnabled && !val.startsWith(CONFIG.DEFAULT_PREFIX)) {
-                els.input.value = CONFIG.DEFAULT_PREFIX + val.replace(/^XC/i, '');
+        function updateClearButtonVisibility() {
+            const hasValue = searchInput.value.length > 0;
+            const isJustPrefix = state.isPrefixEnabled && state.searchType === 'id' && searchInput.value === CONFIG.DEFAULT_PREFIX;
+            clearBtn.classList.toggle('hidden', !hasValue || isJustPrefix);
+        }
+
+        function handleSearchInput() {
+            if (state.searchType === 'id' && state.isPrefixEnabled && !searchInput.value.startsWith(CONFIG.DEFAULT_PREFIX)) {
+                searchInput.value = CONFIG.DEFAULT_PREFIX;
             }
-
-            // 清除按钮显隐
-            const hasContent = els.input.value.length > (state.searchType === 'id' && state.isPrefixEnabled ? 2 : 0);
-            els.clearBtn.classList.toggle('hidden', !hasContent);
-
-            // 防抖搜索/建议
+            updateClearButtonVisibility();
             clearTimeout(state.debounceTimer);
             state.debounceTimer = setTimeout(() => {
-                const q = els.input.value.trim();
-                if (state.searchType === 'id' && q.length > 2) {
-                    fetchSuggestions(q);
+                const query = searchInput.value.trim();
+                const minQueryLength = (state.searchType === 'id' && state.isPrefixEnabled) ? CONFIG.DEFAULT_PREFIX.length : 0;
+                
+                if (query.length > minQueryLength) {
+                    if (state.searchType === 'id') {
+                        fetchSuggestions(query);
+                    }
                 } else {
-                    els.suggestions.box.classList.add('hidden');
+                    suggestionsBox.classList.add('hidden');
                 }
             }, CONFIG.DEBOUNCE_DELAY);
-        });
+        }
 
-        els.input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') performSearch(els.input.value.trim());
-        });
-
-        els.searchBtn.addEventListener('click', () => performSearch(els.input.value.trim()));
+        function trapFocusInModal(e) {
+            if (e.key !== 'Tab') return;
+            const focusableElements = modalContent.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            const firstElement = focusableElements[0];
+            const lastElement = focusableElements[focusableElements.length - 1];
+            if (e.shiftKey) { if (document.activeElement === firstElement) { lastElement.focus(); e.preventDefault(); } } 
+            else { if (document.activeElement === lastElement) { firstElement.focus(); e.preventDefault(); } }
+        }
         
-        els.clearBtn.addEventListener('click', () => {
-            els.input.value = (state.searchType === 'id' && state.isPrefixEnabled) ? CONFIG.DEFAULT_PREFIX : '';
-            els.clearBtn.classList.add('hidden');
-            els.suggestions.box.classList.add('hidden');
-            els.input.focus();
-            showState('info', '请输入内容开始搜索');
-        });
+        // --- 事件监听器 ---
 
-        els.prefixToggle.addEventListener('change', (e) => {
-            state.isPrefixEnabled = e.target.checked;
-            const current = els.input.value;
-            if (state.isPrefixEnabled) {
-                if (!current.startsWith(CONFIG.DEFAULT_PREFIX)) els.input.value = CONFIG.DEFAULT_PREFIX + current;
-            } else {
-                if (current.startsWith(CONFIG.DEFAULT_PREFIX)) els.input.value = current.substring(2);
+        searchTypeSwitcher.addEventListener('click', (e) => {
+            const btn = e.target.closest('.search-type-btn');
+            if (btn && btn.dataset.type) {
+                updateSearchType(btn.dataset.type);
             }
-            els.input.focus();
         });
 
-        // 模态窗 & 查看器事件
-        els.modal.close.addEventListener('click', closeModal);
-        els.modal.overlay.addEventListener('click', closeModal);
-        els.modal.image.addEventListener('click', () => openViewer(els.modal.image.src));
+        searchBtn.addEventListener('click', () => performSearch(searchInput.value.trim()));
+        searchInput.addEventListener('input', handleSearchInput);
+        searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') performSearch(searchInput.value.trim()); });
+        searchInput.addEventListener('focus', () => { if (state.searchType === 'id' && state.isPrefixEnabled && searchInput.value === '') { searchInput.value = CONFIG.DEFAULT_PREFIX; updateClearButtonVisibility(); } });
+        clearBtn.addEventListener('click', () => { searchInput.value = (state.searchType === 'id' && state.isPrefixEnabled) ? CONFIG.DEFAULT_PREFIX : ''; updateClearButtonVisibility(); suggestionsBox.classList.add('hidden'); performSearch(''); searchInput.focus(); });
+        prefixToggle.addEventListener('change', () => { state.isPrefixEnabled = prefixToggle.checked; if (state.isPrefixEnabled) { if(!searchInput.value.startsWith(CONFIG.DEFAULT_PREFIX)) { searchInput.value = CONFIG.DEFAULT_PREFIX + searchInput.value; } } else { if (searchInput.value === CONFIG.DEFAULT_PREFIX) { searchInput.value = ''; } } updateClearButtonVisibility(); searchInput.focus(); });
+        document.addEventListener('click', (e) => { 
+            if (!searchContainer.contains(e.target)) { 
+                suggestionsBox.classList.add('hidden'); 
+            } 
+        });
         
-        els.viewer.close.addEventListener('click', closeViewer);
-        els.viewer.self.addEventListener('click', (e) => { if (e.target === els.viewer.self) closeViewer(); });
+        gallery.addEventListener('click', (e) => {
+            const card = e.target.closest('[role="button"]');
+            if (card && card.dataset.originalImageUrl) {
+                openModal(card.dataset);
+            }
+        });
+        gallery.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const card = e.target.closest('[role="button"]');
+                if (card && card.dataset.originalImageUrl) {
+                    openModal(card.dataset);
+                }
+            }
+        });
+        
+        modalOverlay.addEventListener('click', closeModal);
+        modalCloseBtn.addEventListener('click', closeModal);
 
-        document.addEventListener('keydown', (e) => {
+        // 【新增】为详情图片添加点击事件，以打开查看器
+        modalImage.addEventListener('click', () => {
+            if (modalImage.src) {
+                openImageViewer(modalImage.src);
+            }
+        });
+
+        // 【新增】图片查看器的关闭事件
+        viewerCloseBtn.addEventListener('click', closeImageViewer);
+        imageViewer.addEventListener('click', (e) => {
+            // 点击背景（而不是图片本身）时关闭
+            if (e.target === imageViewer) {
+                closeImageViewer();
+            }
+        });
+
+        // 【修改】全局键盘事件，优先处理最上层的弹窗
+        document.addEventListener('keydown', (e) => { 
             if (e.key === 'Escape') {
-                if (!els.viewer.self.classList.contains('hidden')) closeViewer();
-                else if (!els.modal.self.classList.contains('hidden')) closeModal();
-            }
+                if (!imageViewer.classList.contains('hidden')) {
+                    closeImageViewer(); // 优先关闭图片查看器
+                } else if (!modal.classList.contains('hidden')) {
+                    closeModal(); // 其次关闭详情弹窗
+                }
+            } 
+            // 确保焦点陷阱只在详情弹窗激活且图片查看器关闭时生效
+            if (!modal.classList.contains('hidden') && imageViewer.classList.contains('hidden')) { 
+                trapFocusInModal(e); 
+            } 
         });
-
+        
         // 初始化
         lucide.createIcons();
-        showState('info', '请选择搜索类型，然后输入关键词');
-        if (state.searchType === 'id' && state.isPrefixEnabled) els.input.value = CONFIG.DEFAULT_PREFIX;
+        showMessage('info', '请选择搜索类型，然后输入关键词。');
+        if (state.searchType === 'id' && state.isPrefixEnabled) {
+            searchInput.value = CONFIG.DEFAULT_PREFIX;
+        }
     });
     </script>
 </body>
