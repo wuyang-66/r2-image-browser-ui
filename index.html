@@ -3,18 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>迅驰工具在线查询</title>
+    <title>🎄 迅驰工具 - 圣诞版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
-            --brand-color-from: #3b82f6; /* blue-500 */
-            --brand-color-to: #14b8a6;   /* teal-500 */
+            /* 圣诞配色：红到绿 */
+            --brand-color-from: #dc2626; /* red-600 */
+            --brand-color-to: #15803d;   /* green-700 */
+            --christmas-gold: #f59e0b;   /* amber-500 */
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-            background-color: #f8fafc; /* slate-50 */
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+            background-color: #f8fafc;
+            /* 简单的雪地背景渐变 */
+            background-image: linear-gradient(to bottom, #f1f5f9 0%, #ffffff 100%); 
+            min-height: 100vh;
+            position: relative;
         }
+
+        /* 雪花动画 */
+        .snowflake {
+            position: fixed;
+            top: -10px;
+            color: #dbeafe; /* 非常淡的蓝色雪花 */
+            font-size: 1em;
+            font-family: Arial;
+            text-shadow: 0 0 1px #000;
+            user-select: none;
+            z-index: 0; /* 在内容之下 */
+            pointer-events: none;
+            animation-name: snowflakes-fall, snowflakes-shake;
+            animation-duration: 10s, 3s;
+            animation-timing-function: linear, ease-in-out;
+            animation-iteration-count: infinite, infinite;
+            opacity: 0.6;
+        }
+
+        @keyframes snowflakes-fall {
+            0% { top: -10%; }
+            100% { top: 100%; }
+        }
+
+        @keyframes snowflakes-shake {
+            0% { transform: translateX(0px); }
+            50% { transform: translateX(80px); }
+            100% { transform: translateX(0px); }
+        }
+
         /* 动画效果 */
         @keyframes modal-in { from { opacity: 0; transform: scale(0.95) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -25,7 +61,7 @@
 
         /* 图片加载占位符 */
         .image-placeholder {
-            background-color: #e2e8f0; /* slate-200 */
+            background-color: #f1f5f9;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -33,7 +69,7 @@
             height: 100%;
         }
         
-        /* 自定义Toggle开关 */
+        /* 自定义Toggle开关 - 圣诞红 */
         .toggle-checkbox:checked {
             right: 0;
             border-color: var(--brand-color-from);
@@ -54,111 +90,170 @@
         .search-type-btn {
             padding: 8px 16px;
             border-radius: 9999px;
-            border: 1px solid #cbd5e1; /* slate-300 */
+            border: 1px solid #cbd5e1;
             cursor: pointer;
             transition: all 0.2s ease-in-out;
-            font-weight: 500;
+            font-weight: 600;
             background-color: white;
-            color: #475569; /* slate-600 */
+            color: #64748b;
         }
         .search-type-btn.active {
-            background-color: var(--brand-color-from);
+            background-color: var(--brand-color-from); /* 红色背景 */
             color: white;
             border-color: var(--brand-color-from);
+            box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3); /* 红色阴影 */
         }
         .search-type-btn:not(.active):hover {
-            background-color: #f1f5f9; /* slate-100 */
+            background-color: #fef2f2; /* 浅红色 hover */
+            color: #dc2626;
+            border-color: #fca5a5;
         }
-        /* 【新增】为详情页图片添加放大鼠标指针 */
+
+        /* 卡片特效 */
+        .gallery-card:hover {
+            border-color: #fca5a5; /* 浅红边框 */
+            box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.1), 0 4px 6px -2px rgba(220, 38, 38, 0.05);
+        }
+
+        /* 详情页图片放大指针 */
         #modal-image {
             cursor: zoom-in;
+        }
+        
+        /* 装饰性铃铛摇晃 */
+        .bell-shake:hover {
+            animation: bell-shake 2s infinite;
+            transform-origin: top center;
+        }
+        @keyframes bell-shake {
+            0% { transform: rotate(0); }
+            15% { transform: rotate(5deg); }
+            30% { transform: rotate(-5deg); }
+            45% { transform: rotate(4deg); }
+            60% { transform: rotate(-4deg); }
+            75% { transform: rotate(2deg); }
+            85% { transform: rotate(-2deg); }
+            100% { transform: rotate(0); }
         }
     </style>
 </head>
 <body class="antialiased text-slate-800">
 
-    <div id="prefix-toggle-container" class="absolute top-4 right-4 z-20 flex items-center">
-        <label for="prefix-toggle" class="text-sm text-slate-600 mr-3 cursor-pointer">自动添加 "XC" 前缀</label>
-        <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+    <!-- 雪花容器 -->
+    <div id="snow-container" aria-hidden="true"></div>
+
+    <!-- 顶部装饰条 -->
+    <div class="h-2 w-full bg-gradient-to-r from-red-600 via-green-600 to-red-600"></div>
+
+    <div id="prefix-toggle-container" class="absolute top-6 right-4 z-20 flex items-center bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-sm border border-slate-100">
+        <label for="prefix-toggle" class="text-sm text-slate-600 mr-3 cursor-pointer font-medium">自动添加 "XC"</label>
+        <div class="relative inline-block w-10 mr-1 align-middle select-none transition duration-200 ease-in">
             <input type="checkbox" name="prefix-toggle" id="prefix-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" checked/>
-            <label for="prefix-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+            <label for="prefix-toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-200 cursor-pointer"></label>
         </div>
     </div>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-        <header class="text-center mb-8 md:mb-12 pt-8">
-            <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)]">
-                迅驰工具编号在线查询
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 relative z-10">
+        <header class="text-center mb-8 md:mb-12 pt-4">
+            <div class="inline-flex items-center justify-center mb-2 space-x-2">
+                <span class="text-4xl animate-bounce" style="animation-duration: 2s;">🎅</span>
+                <span class="text-4xl animate-bounce" style="animation-duration: 2.5s; animation-delay: 0.5s;">🎄</span>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)] drop-shadow-sm">
+                迅驰工具 · 圣诞查询
             </h1>
-            <p class="mt-3 text-lg text-slate-500">随时随地，查看工具信息</p>
+            <p class="mt-3 text-lg text-slate-500 font-medium">
+                <span class="text-red-500">Merry</span> <span class="text-green-600">Christmas</span> & Happy New Year
+            </p>
         </header>
 
         <div id="search-type-switcher" class="flex justify-center mb-6 space-x-2">
-            <button data-type="id" class="search-type-btn active">按编号搜索</button>
-            <button data-type="name" class="search-type-btn">按名称/关键词搜索</button>
+            <button data-type="id" class="search-type-btn active">
+                <i data-lucide="hash" class="w-4 h-4 inline-block mr-1"></i>按编号
+            </button>
+            <button data-type="name" class="search-type-btn">
+                <i data-lucide="type" class="w-4 h-4 inline-block mr-1"></i>按名称
+            </button>
         </div>
 
-        <div class="max-w-3xl mx-auto flex items-center space-x-2">
+        <div class="max-w-3xl mx-auto flex items-center space-x-2 relative">
+            <!-- 装饰：搜索框上的槲寄生或小装饰 -->
+            <div class="absolute -top-3 -left-2 text-2xl z-20 pointer-events-none transform -rotate-12">🎁</div>
+
             <div class="relative flex-grow" id="search-container">
                 <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <i data-lucide="search" class="w-5 h-5 text-slate-400"></i>
+                    <i data-lucide="search" class="w-5 h-5 text-red-400"></i>
                 </div>
                 <input type="search" id="search-input" placeholder="输入编号进行搜索..."
                        aria-label="搜索工具"
                        class="w-full pl-12 pr-10 py-3 text-base border-2 border-slate-200 rounded-full shadow-sm 
-                              focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none
-                              transition-all duration-300 ease-in-out"
+                              focus:ring-2 focus:ring-red-400 focus:border-red-400 outline-none
+                              transition-all duration-300 ease-in-out bg-white/90 backdrop-blur"
                        autocomplete="off">
                 <button id="clear-btn" class="absolute inset-y-0 right-0 pr-4 flex items-center cursor-pointer hidden" aria-label="清空搜索框">
-                    <i data-lucide="x-circle" class="w-5 h-5 text-slate-400 hover:text-slate-600"></i>
+                    <i data-lucide="x-circle" class="w-5 h-5 text-slate-400 hover:text-red-500 transition-colors"></i>
                 </button>
                 
-                <div id="suggestions-box" class="absolute z-40 w-full mt-2 bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden hidden">
-                    <ul id="suggestions-list"></ul>
+                <div id="suggestions-box" class="absolute z-40 w-full mt-2 bg-white rounded-2xl shadow-xl border border-red-100 overflow-hidden hidden">
+                    <ul id="suggestions-list" class="divide-y divide-slate-50"></ul>
                 </div>
             </div>
             
-            <button id="search-btn" class="flex-shrink-0 px-5 py-3 font-semibold text-white bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)] rounded-full shadow-sm hover:opacity-90 transition-opacity" aria-label="执行搜索">
+            <button id="search-btn" class="flex-shrink-0 px-6 py-3 font-bold text-white bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)] rounded-full shadow-lg shadow-red-200 hover:shadow-red-300 hover:scale-105 transition-all duration-200 active:scale-95" aria-label="执行搜索">
                 <span>搜索</span>
             </button>
         </div>
         
         <div id="results-count-container" class="max-w-3xl mx-auto mt-6 hidden"></div>
 
-        <main id="gallery" class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></main>
+        <main id="gallery" class="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></main>
         <div id="gallery-message" class="mt-12"></div>
     </div>
     
+    <!-- 底部装饰 -->
+    <footer class="fixed bottom-0 w-full pointer-events-none opacity-20 z-0">
+        <svg viewBox="0 0 1440 320" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#dc2626" fill-opacity="0.3" d="M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,250.7C672,235,768,181,864,181.3C960,181,1056,235,1152,234.7C1248,235,1344,181,1392,154.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+        </svg>
+    </footer>
+
     <!-- 详情弹窗 -->
     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div id="modal-overlay" class="absolute inset-0 bg-black/70 fade-in-bg" aria-hidden="true"></div>
-        <div id="modal-content" class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden modal-enter">
-            <div class="w-full md:w-3/5 bg-slate-100 flex items-center justify-center p-4 relative">
-                <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-20 bg-white/50 rounded-full p-1" aria-label="关闭弹窗">
-                    <i data-lucide="x" class="w-7 h-7"></i>
+        <div id="modal-overlay" class="absolute inset-0 bg-slate-900/80 backdrop-blur-sm fade-in-bg" aria-hidden="true"></div>
+        <div id="modal-content" class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden modal-enter border-t-4 border-red-500">
+            <div class="w-full md:w-3/5 bg-slate-50 flex items-center justify-center p-4 relative pattern-grid-lg text-slate-100">
+                <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-400 hover:text-red-500 transition-colors z-20 bg-white rounded-full p-1 shadow-sm" aria-label="关闭弹窗">
+                    <i data-lucide="x" class="w-6 h-6"></i>
                 </button>
-                <img id="modal-image" src="" alt="详情图片" class="max-w-full max-h-[40vh] md:max-h-[80vh] object-contain">
+                <img id="modal-image" src="" alt="详情图片" class="max-w-full max-h-[40vh] md:max-h-[80vh] object-contain drop-shadow-md">
             </div>
             <div class="w-full md:w-2/5 p-8 overflow-y-auto">
+                <div class="flex items-center space-x-2 mb-2">
+                    <span class="px-2 py-1 text-xs font-bold text-red-600 bg-red-100 rounded-full">CHRISTMAS SPECIAL</span>
+                </div>
                 <h2 id="modal-title" class="text-3xl font-bold text-slate-800"></h2>
-                <div class="mt-6 space-y-4 text-slate-600">
-                    <div>
-                        <h3 class="font-semibold text-slate-800">产品名称</h3>
-                        <p id="modal-product-name"></p>
+                <div class="mt-6 space-y-6 text-slate-600">
+                    <div class="bg-red-50 p-4 rounded-xl border border-red-100">
+                        <h3 class="font-bold text-red-800 flex items-center mb-2">
+                            <i data-lucide="package" class="w-4 h-4 mr-2"></i>产品名称
+                        </h3>
+                        <p id="modal-product-name" class="text-slate-700 font-medium"></p>
                     </div>
                     <div>
-                        <h3 class="font-semibold text-slate-800">功能用途</h3>
-                        <p id="modal-description"></p>
+                        <h3 class="font-bold text-slate-800 flex items-center mb-2">
+                            <i data-lucide="info" class="w-4 h-4 mr-2 text-green-600"></i>功能用途
+                        </h3>
+                        <p id="modal-description" class="leading-relaxed"></p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 【新增】全屏图片查看器 -->
-    <div id="image-viewer" class="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 hidden transition-opacity duration-300" role="dialog" aria-modal="true">
+    <!-- 全屏图片查看器 -->
+    <div id="image-viewer" class="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 hidden transition-opacity duration-300" role="dialog" aria-modal="true">
         <img id="viewer-image" src="" alt="全尺寸图片" class="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"/>
-        <button id="viewer-close-btn" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors" aria-label="关闭图片查看器">
+        <button id="viewer-close-btn" class="absolute top-4 right-4 text-white/70 hover:text-red-500 transition-colors" aria-label="关闭图片查看器">
             <i data-lucide="x" class="w-10 h-10"></i>
         </button>
     </div>
@@ -166,6 +261,30 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // --- 圣诞雪花特效逻辑 ---
+        function createSnowflakes() {
+            const container = document.getElementById('snow-container');
+            const snowflakeCount = 20; // 雪花数量
+            const characters = ['❅', '❆', '❄']; // 雪花样式
+
+            for (let i = 0; i < snowflakeCount; i++) {
+                const flake = document.createElement('div');
+                flake.className = 'snowflake';
+                flake.textContent = characters[Math.floor(Math.random() * characters.length)];
+                
+                // 随机位置和动画参数
+                flake.style.left = Math.random() * 100 + 'vw';
+                flake.style.animationDuration = (Math.random() * 5 + 5) + 's, ' + (Math.random() * 2 + 1) + 's'; // 下落速度和摇摆速度
+                flake.style.animationDelay = (Math.random() * 5) + 's, ' + (Math.random()) + 's';
+                flake.style.fontSize = (Math.random() * 1 + 0.5) + 'em'; // 大小
+                flake.style.opacity = Math.random() * 0.5 + 0.3;
+
+                container.appendChild(flake);
+            }
+        }
+        createSnowflakes();
+
+        // --- 原有逻辑 ---
         const CONFIG = {
             API_WORKER_URL: "https://xiaowuyang.dpdns.org",
             R2_BUCKET_URL: "https://xiaowuya.dpdns.org",
@@ -203,7 +322,7 @@
         const modalProductName = document.getElementById('modal-product-name');
         const modalDescription = document.getElementById('modal-description');
 
-        // 【新增】图片查看器元素
+        // 图片查看器元素
         const imageViewer = document.getElementById('image-viewer');
         const viewerImage = document.getElementById('viewer-image');
         const viewerCloseBtn = document.getElementById('viewer-close-btn');
@@ -215,10 +334,12 @@
 
             let icon = '';
             const iconClasses = "w-12 h-12";
-            if (type === 'loading') icon = `<i data-lucide="loader-2" class="${iconClasses} animate-spin text-blue-500"></i>`;
-            else if (type === 'info') icon = `<i data-lucide="search" class="${iconClasses} text-slate-400"></i>`;
+            // 圣诞版：修改图标颜色
+            if (type === 'loading') icon = `<i data-lucide="loader-2" class="${iconClasses} animate-spin text-red-500"></i>`;
+            else if (type === 'info') icon = `<i data-lucide="gift" class="${iconClasses} text-slate-300"></i>`; // 默认显示礼物盒
             else if (type === 'error') icon = `<i data-lucide="alert-triangle" class="${iconClasses} text-red-500"></i>`;
-            galleryMessage.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[30vh] text-slate-500">${icon}<p class="mt-4 text-lg text-center">${message}</p></div>`;
+            
+            galleryMessage.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[30vh] text-slate-500">${icon}<p class="mt-4 text-lg text-center font-medium">${message}</p></div>`;
             lucide.createIcons();
         }
         
@@ -227,14 +348,14 @@
             gallery.innerHTML = '';
             
             if (images.length === 0) {
-                showMessage('info', '未找到符合条件的结果。');
+                showMessage('info', '未找到符合条件的结果，或许圣诞老人在路上？');
                 return;
             }
 
             resultsCountContainer.innerHTML = `
-                <div class="flex items-center text-sm text-slate-500 font-medium">
-                    <i data-lucide="check-circle-2" class="w-5 h-5 mr-2 text-teal-500"></i>
-                    <span>为您找到 ${images.length} 个相关结果</span>
+                <div class="flex items-center text-sm text-slate-600 font-bold bg-white px-4 py-2 rounded-full shadow-sm inline-block border border-green-100">
+                    <i data-lucide="check-circle-2" class="w-5 h-5 mr-2 text-green-600"></i>
+                    <span>为您找到 <span class="text-red-600 text-base">${images.length}</span> 个相关结果</span>
                 </div>
             `;
             resultsCountContainer.classList.remove('hidden');
@@ -245,7 +366,8 @@
                 const thumbnailUrl = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/${imageOptions}/${originalImageUrl}`;
 
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 group cursor-pointer';
+                // 添加 gallery-card 类以便应用 CSS hover 效果
+                card.className = 'gallery-card bg-white rounded-xl overflow-hidden shadow-sm border border-slate-100 transition-all duration-300 group cursor-pointer hover:-translate-y-1';
                 card.style.animation = `popIn 0.5s ease-out ${index * 50}ms forwards`;
                 card.style.opacity = '0';
                 card.setAttribute('role', 'button');
@@ -263,13 +385,15 @@
                         </div>
                         <img src="${thumbnailUrl}" alt="${image.productName}" loading="lazy" 
                              class="w-full h-full object-cover opacity-0 group-hover:scale-110 transition-all duration-500 ease-in-out">
-                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                             <p class="text-white font-bold text-lg">查看详情</p>
+                        <div class="absolute inset-0 bg-gradient-to-t from-red-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-6">
+                             <p class="text-white font-bold text-lg flex items-center"><i data-lucide="zoom-in" class="w-5 h-5 mr-1"></i> 查看详情</p>
                         </div>
                     </div>
-                    <div class="p-3 bg-slate-50">
-                        <p class="text-sm font-semibold text-slate-600 text-center truncate" title="${image.productName}">${image.productName}</p>
-                        <p class="text-xs text-slate-400 text-center mt-1">${image.displayName}</p>
+                    <div class="p-4 bg-white relative">
+                         <!-- 装饰小点 -->
+                         <div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-green-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <p class="text-sm font-bold text-slate-700 text-center truncate group-hover:text-red-600 transition-colors" title="${image.productName}">${image.productName}</p>
+                        <p class="text-xs text-slate-400 text-center mt-1 font-mono">${image.displayName}</p>
                     </div>
                 `;
                 
@@ -286,7 +410,7 @@
         async function performSearch(query) {
             clearTimeout(state.debounceTimer);
             if (!query) {
-                showMessage('info', '请输入“编号”或“关键词”进行搜索。');
+                showMessage('info', '请输入“编号”或“关键词”开始搜索。');
                 return;
             }
             showMessage('loading', `正在搜索 "${query}"...`);
@@ -340,8 +464,8 @@
             suggestionsList.innerHTML = '';
             suggestions.forEach(suggestion => {
                 const li = document.createElement('li');
-                li.className = 'px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors duration-150';
-                li.textContent = suggestion;
+                li.className = 'px-4 py-3 cursor-pointer hover:bg-red-50 hover:text-red-700 transition-colors duration-150 flex items-center';
+                li.innerHTML = `<i data-lucide="search" class="w-3 h-3 mr-2 text-slate-300"></i> ${suggestion}`;
                 li.addEventListener('mousedown', (e) => {
                     e.preventDefault();
                     searchInput.value = suggestion;
@@ -350,12 +474,13 @@
                 });
                 suggestionsList.appendChild(li);
             });
+            lucide.createIcons();
             suggestionsBox.classList.remove('hidden');
         }
 
         function openModal(cardData) {
             state.lastFocusedElement = document.activeElement;
-            modalImage.src = cardData.originalImageUrl; // 这里加载的是原图
+            modalImage.src = cardData.originalImageUrl;
             modalTitle.textContent = cardData.displayName;
             modalProductName.textContent = cardData.productName;
             modalDescription.textContent = cardData.description;
@@ -373,7 +498,6 @@
             }
         }
 
-        // 【新增】打开图片查看器
         function openImageViewer(imageUrl) {
             viewerImage.src = imageUrl;
             imageViewer.classList.remove('hidden');
@@ -381,12 +505,11 @@
             setTimeout(() => imageViewer.style.opacity = '1', 10);
         }
 
-        // 【新增】关闭图片查看器
         function closeImageViewer() {
             imageViewer.style.opacity = '0';
             setTimeout(() => {
                 imageViewer.classList.add('hidden');
-                viewerImage.src = ''; // 清空src，避免下次打开时闪现旧图
+                viewerImage.src = ''; 
             }, 300);
         }
 
@@ -401,13 +524,13 @@
             performSearch('');
 
             if (newType === 'id') {
-                searchInput.placeholder = '输入编号进行搜索...';
+                searchInput.placeholder = '输入编号搜索 (自动加XC)';
                 prefixToggleContainer.style.display = 'flex';
                 if (state.isPrefixEnabled) {
                     searchInput.value = CONFIG.DEFAULT_PREFIX;
                 }
             } else {
-                searchInput.placeholder = '输入产品名称关键词进行搜索...';
+                searchInput.placeholder = '输入工具名称搜索...';
                 prefixToggleContainer.style.display = 'none';
                 suggestionsBox.classList.add('hidden');
             }
@@ -489,32 +612,27 @@
         modalOverlay.addEventListener('click', closeModal);
         modalCloseBtn.addEventListener('click', closeModal);
 
-        // 【新增】为详情图片添加点击事件，以打开查看器
         modalImage.addEventListener('click', () => {
             if (modalImage.src) {
                 openImageViewer(modalImage.src);
             }
         });
 
-        // 【新增】图片查看器的关闭事件
         viewerCloseBtn.addEventListener('click', closeImageViewer);
         imageViewer.addEventListener('click', (e) => {
-            // 点击背景（而不是图片本身）时关闭
             if (e.target === imageViewer) {
                 closeImageViewer();
             }
         });
 
-        // 【修改】全局键盘事件，优先处理最上层的弹窗
         document.addEventListener('keydown', (e) => { 
             if (e.key === 'Escape') {
                 if (!imageViewer.classList.contains('hidden')) {
-                    closeImageViewer(); // 优先关闭图片查看器
+                    closeImageViewer(); 
                 } else if (!modal.classList.contains('hidden')) {
-                    closeModal(); // 其次关闭详情弹窗
+                    closeModal(); 
                 }
             } 
-            // 确保焦点陷阱只在详情弹窗激活且图片查看器关闭时生效
             if (!modal.classList.contains('hidden') && imageViewer.classList.contains('hidden')) { 
                 trapFocusInModal(e); 
             } 
@@ -522,7 +640,7 @@
         
         // 初始化
         lucide.createIcons();
-        showMessage('info', '请选择搜索类型，然后输入关键词。');
+        showMessage('info', '请选择搜索类型，然后输入关键词。<br><span class="text-sm text-red-400">祝您圣诞快乐！</span>');
         if (state.searchType === 'id' && state.isPrefixEnabled) {
             searchInput.value = CONFIG.DEFAULT_PREFIX;
         }
