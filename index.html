@@ -69,7 +69,6 @@
         .search-type-btn:not(.active):hover {
             background-color: #f1f5f9; /* slate-100 */
         }
-        /* 【新增】为详情页图片添加放大鼠标指针 */
         #modal-image {
             cursor: zoom-in;
         }
@@ -126,6 +125,15 @@
         <div id="results-count-container" class="max-w-3xl mx-auto mt-6 hidden"></div>
 
         <main id="gallery" class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></main>
+        
+        <!-- 加载更多按钮容器 -->
+        <div id="load-more-container" class="mt-8 text-center hidden">
+             <button id="load-more-btn" class="px-6 py-2 bg-white border border-slate-300 rounded-full text-slate-600 font-medium hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-sm flex items-center justify-center mx-auto">
+                <i data-lucide="arrow-down-circle" class="w-4 h-4 mr-2"></i>
+                加载更多
+             </button>
+        </div>
+
         <div id="gallery-message" class="mt-12"></div>
     </div>
     
@@ -155,7 +163,7 @@
         </div>
     </div>
 
-    <!-- 【新增】全屏图片查看器 -->
+    <!-- 全屏图片查看器 -->
     <div id="image-viewer" class="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 hidden transition-opacity duration-300" role="dialog" aria-modal="true">
         <img id="viewer-image" src="" alt="全尺寸图片" class="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"/>
         <button id="viewer-close-btn" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors" aria-label="关闭图片查看器">
@@ -176,7 +184,11 @@
             debounceTimer: null, 
             isPrefixEnabled: true, 
             lastFocusedElement: null,
-            searchType: 'id'
+            searchType: 'id',
+            // 【新增】分页状态
+            nextCursor: null,
+            isLoadingMore: false,
+            currentQuery: '' // 记录当前搜索词，防止加载更多时搜索词变化
         };
         
         // DOM 元素获取
@@ -193,6 +205,10 @@
         const searchTypeSwitcher = document.getElementById('search-type-switcher');
         const resultsCountContainer = document.getElementById('results-count-container');
         
+        // 【新增】加载更多相关元素
+        const loadMoreContainer = document.getElementById('load-more-container');
+        const loadMoreBtn = document.getElementById('load-more-btn');
+        
         // 详情弹窗元素
         const modal = document.getElementById('modal');
         const modalOverlay = document.getElementById('modal-overlay');
@@ -203,7 +219,7 @@
         const modalProductName = document.getElementById('modal-product-name');
         const modalDescription = document.getElementById('modal-description');
 
-        // 【新增】图片查看器元素
+        // 图片查看器元素
         const imageViewer = document.getElementById('image-viewer');
         const viewerImage = document.getElementById('viewer-image');
         const viewerCloseBtn = document.getElementById('viewer-close-btn');
@@ -212,6 +228,7 @@
             gallery.innerHTML = '';
             resultsCountContainer.classList.add('hidden');
             resultsCountContainer.innerHTML = '';
+            loadMoreContainer.classList.add('hidden'); // 隐藏加载更多
 
             let icon = '';
             const iconClasses = "w-12 h-12";
@@ -222,22 +239,28 @@
             lucide.createIcons();
         }
         
-        function renderGallery(images) {
+        function renderGallery(images, isLoadMore = false) {
             galleryMessage.innerHTML = '';
-            gallery.innerHTML = '';
             
-            if (images.length === 0) {
+            if (!isLoadMore) {
+                gallery.innerHTML = '';
+            }
+            
+            if (images.length === 0 && !isLoadMore) {
                 showMessage('info', '未找到符合条件的结果。');
                 return;
             }
 
-            resultsCountContainer.innerHTML = `
-                <div class="flex items-center text-sm text-slate-500 font-medium">
-                    <i data-lucide="check-circle-2" class="w-5 h-5 mr-2 text-teal-500"></i>
-                    <span>为您找到 ${images.length} 个相关结果</span>
-                </div>
-            `;
-            resultsCountContainer.classList.remove('hidden');
+            // 更新结果数量提示 (仅在非加载更多时，或你想累计数量也可以)
+            if (!isLoadMore) {
+                resultsCountContainer.innerHTML = `
+                    <div class="flex items-center text-sm text-slate-500 font-medium">
+                        <i data-lucide="check-circle-2" class="w-5 h-5 mr-2 text-teal-500"></i>
+                        <span>搜索结果如下</span>
+                    </div>
+                `;
+                resultsCountContainer.classList.remove('hidden');
+            }
 
             images.forEach((image, index) => {
                 const originalImageUrl = `${CONFIG.R2_BUCKET_URL}/${image.key}`;
@@ -246,7 +269,9 @@
 
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 group cursor-pointer';
-                card.style.animation = `popIn 0.5s ease-out ${index * 50}ms forwards`;
+                // 如果是加载更多，动画延迟稍微调整，避免太久
+                const delay = isLoadMore ? index * 50 : index * 50;
+                card.style.animation = `popIn 0.5s ease-out ${delay}ms forwards`;
                 card.style.opacity = '0';
                 card.setAttribute('role', 'button');
                 card.setAttribute('tabindex', '0');
@@ -283,31 +308,71 @@
             lucide.createIcons();
         }
 
-        async function performSearch(query) {
+        async function performSearch(query, isLoadMore = false) {
             clearTimeout(state.debounceTimer);
             if (!query) {
                 showMessage('info', '请输入“编号”或“关键词”进行搜索。');
                 return;
             }
-            showMessage('loading', `正在搜索 "${query}"...`);
-            suggestionsBox.classList.add('hidden');
+
+            // 如果不是加载更多，重置状态
+            if (!isLoadMore) {
+                state.nextCursor = null;
+                state.currentQuery = query;
+                showMessage('loading', `正在搜索 "${query}"...`);
+                suggestionsBox.classList.add('hidden');
+                loadMoreContainer.classList.add('hidden');
+            } else {
+                // 加载更多时的 loading 状态（可选：让按钮变 loading）
+                loadMoreBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i> 加载中...`;
+                loadMoreBtn.disabled = true;
+                lucide.createIcons();
+            }
+
             try {
-                let searchUrl = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(query)}`;
+                let searchUrl = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(state.currentQuery)}`;
                 if (state.searchType === 'name') {
                     searchUrl += '&type=name';
+                }
+                
+                // 【关键】加上 cursor 参数
+                if (isLoadMore && state.nextCursor) {
+                    searchUrl += `&cursor=${encodeURIComponent(state.nextCursor)}`;
                 }
 
                 const response = await fetch(searchUrl);
                 if (!response.ok) throw new Error(`服务器响应错误: ${response.status}`);
                 const data = await response.json();
+                
                 if (data.success && data.images) {
-                    renderGallery(data.images);
+                    // 更新分页状态
+                    if (data.pagination) {
+                        state.nextCursor = data.pagination.nextCursor;
+                        // 显示/隐藏加载更多按钮
+                        if (data.pagination.hasMore) {
+                            loadMoreContainer.classList.remove('hidden');
+                        } else {
+                            loadMoreContainer.classList.add('hidden');
+                        }
+                    } else {
+                        // 如果后端没返回分页信息（比如名称搜索），默认隐藏按钮
+                        loadMoreContainer.classList.add('hidden');
+                    }
+
+                    renderGallery(data.images, isLoadMore);
                 } else {
-                    showMessage('error', data.error || '未能获取结果。');
+                    if (!isLoadMore) showMessage('error', data.error || '未能获取结果。');
                 }
             } catch (error) {
                 console.error("搜索失败:", error);
-                showMessage('error', '无法连接到服务器。请检查网络或API状态。');
+                if (!isLoadMore) showMessage('error', '无法连接到服务器。请检查网络或API状态。');
+            } finally {
+                // 恢复按钮状态
+                if (isLoadMore) {
+                    loadMoreBtn.innerHTML = `<i data-lucide="arrow-down-circle" class="w-4 h-4 mr-2"></i> 加载更多`;
+                    loadMoreBtn.disabled = false;
+                    lucide.createIcons();
+                }
             }
         }
         
@@ -355,7 +420,7 @@
 
         function openModal(cardData) {
             state.lastFocusedElement = document.activeElement;
-            modalImage.src = cardData.originalImageUrl; // 这里加载的是原图
+            modalImage.src = cardData.originalImageUrl; 
             modalTitle.textContent = cardData.displayName;
             modalProductName.textContent = cardData.productName;
             modalDescription.textContent = cardData.description;
@@ -373,7 +438,6 @@
             }
         }
 
-        // 【新增】打开图片查看器
         function openImageViewer(imageUrl) {
             viewerImage.src = imageUrl;
             imageViewer.classList.remove('hidden');
@@ -381,12 +445,11 @@
             setTimeout(() => imageViewer.style.opacity = '1', 10);
         }
 
-        // 【新增】关闭图片查看器
         function closeImageViewer() {
             imageViewer.style.opacity = '0';
             setTimeout(() => {
                 imageViewer.classList.add('hidden');
-                viewerImage.src = ''; // 清空src，避免下次打开时闪现旧图
+                viewerImage.src = ''; 
             }, 300);
         }
 
@@ -398,8 +461,11 @@
                 btn.classList.toggle('active', btn.dataset.type === newType);
             });
             searchInput.value = '';
-            performSearch('');
-
+            // 清空搜索结果和按钮
+            gallery.innerHTML = '';
+            loadMoreContainer.classList.add('hidden');
+            resultsCountContainer.classList.add('hidden');
+            
             if (newType === 'id') {
                 searchInput.placeholder = '输入编号进行搜索...';
                 prefixToggleContainer.style.display = 'flex';
@@ -459,7 +525,16 @@
             }
         });
 
+        // 绑定搜索按钮（触发全新搜索）
         searchBtn.addEventListener('click', () => performSearch(searchInput.value.trim()));
+        
+        // 绑定加载更多按钮
+        loadMoreBtn.addEventListener('click', () => {
+            if (state.nextCursor) {
+                performSearch(searchInput.value.trim(), true); // true 表示是加载更多
+            }
+        });
+
         searchInput.addEventListener('input', handleSearchInput);
         searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') performSearch(searchInput.value.trim()); });
         searchInput.addEventListener('focus', () => { if (state.searchType === 'id' && state.isPrefixEnabled && searchInput.value === '') { searchInput.value = CONFIG.DEFAULT_PREFIX; updateClearButtonVisibility(); } });
@@ -489,38 +564,32 @@
         modalOverlay.addEventListener('click', closeModal);
         modalCloseBtn.addEventListener('click', closeModal);
 
-        // 【新增】为详情图片添加点击事件，以打开查看器
         modalImage.addEventListener('click', () => {
             if (modalImage.src) {
                 openImageViewer(modalImage.src);
             }
         });
 
-        // 【新增】图片查看器的关闭事件
         viewerCloseBtn.addEventListener('click', closeImageViewer);
         imageViewer.addEventListener('click', (e) => {
-            // 点击背景（而不是图片本身）时关闭
             if (e.target === imageViewer) {
                 closeImageViewer();
             }
         });
 
-        // 【修改】全局键盘事件，优先处理最上层的弹窗
         document.addEventListener('keydown', (e) => { 
             if (e.key === 'Escape') {
                 if (!imageViewer.classList.contains('hidden')) {
-                    closeImageViewer(); // 优先关闭图片查看器
+                    closeImageViewer(); 
                 } else if (!modal.classList.contains('hidden')) {
-                    closeModal(); // 其次关闭详情弹窗
+                    closeModal(); 
                 }
             } 
-            // 确保焦点陷阱只在详情弹窗激活且图片查看器关闭时生效
             if (!modal.classList.contains('hidden') && imageViewer.classList.contains('hidden')) { 
                 trapFocusInModal(e); 
             } 
         });
         
-        // 初始化
         lucide.createIcons();
         showMessage('info', '请选择搜索类型，然后输入关键词。');
         if (state.searchType === 'id' && state.isPrefixEnabled) {
