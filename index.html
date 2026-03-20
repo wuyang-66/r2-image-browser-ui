@@ -31,11 +31,9 @@
             height: 100%;
         }
         
-        /* 自定义Toggle开关 */
         .toggle-checkbox:checked { right: 0; border-color: var(--brand-color-from); }
         .toggle-checkbox:checked + .toggle-label { background-color: var(--brand-color-from); }
 
-        /* 彻底隐藏浏览器默认的搜索框清除按钮 */
         input[type="search"]::-webkit-search-decoration,
         input[type="search"]::-webkit-search-cancel-button,
         input[type="search"]::-webkit-search-results-button,
@@ -62,11 +60,7 @@
         
         #modal-image { cursor: zoom-in; }
 
-        /* 建议框滚动条 */
-        #suggestions-box {
-            max-height: 320px;
-            overflow-y: auto;
-        }
+        #suggestions-box { max-height: 320px; overflow-y: auto; }
         #suggestions-box::-webkit-scrollbar { width: 6px; }
         #suggestions-box::-webkit-scrollbar-track { background: #f1f5f9; }
         #suggestions-box::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -95,7 +89,6 @@
             <button data-type="name" class="search-type-btn">按名称/关键词搜索</button>
         </div>
 
-        <!-- 验证提示区域 -->
         <div class="max-w-3xl mx-auto h-6 mb-1 text-center">
             <p id="search-validation-msg" class="text-sm font-medium transition-all duration-200 opacity-0 transform translate-y-1"></p>
         </div>
@@ -105,11 +98,9 @@
                 <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <i data-lucide="search" class="w-5 h-5 text-slate-400"></i>
                 </div>
-                <!-- 视觉前缀标签，替代过去直接输入框内塞值的方式 -->
                 <div id="visual-prefix" class="absolute inset-y-0 left-10 flex items-center font-bold text-slate-400 pointer-events-none transition-opacity duration-200">
                     XC
                 </div>
-                <!-- pl-16 用于给前缀留出空间 -->
                 <input type="search" id="search-input" placeholder="输入编号进行搜索..."
                        class="w-full pl-16 pr-10 py-3 text-base border-2 border-slate-200 rounded-full shadow-sm 
                               focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none
@@ -130,9 +121,18 @@
         </div>
         
         <div id="results-count-container" class="max-w-3xl mx-auto mt-6 hidden"></div>
+        
+        <!-- 新增：最新收录板块标题 (默认隐藏，只有在显示最近更新时才显示) -->
+        <div id="recent-title" class="max-w-7xl mx-auto mt-10 mb-2 hidden flex items-center justify-between">
+            <div class="flex items-center text-xl font-bold text-slate-700">
+                <i data-lucide="sparkles" class="w-6 h-6 text-amber-500 mr-2"></i>
+                近期更新
+            </div>
+            <span class="text-sm text-slate-400 bg-slate-100 px-3 py-1 rounded-full">New</span>
+        </div>
+
         <main id="gallery" class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></main>
 
-        <!-- 加载更多 -->
         <div id="load-more-container" class="mt-12 mb-12 flex flex-col items-center hidden">
             <button id="load-more-btn" class="px-8 py-3 bg-white border border-slate-200 text-slate-600 rounded-full font-medium hover:bg-slate-50 transition-colors shadow-sm flex items-center">
                 <span id="load-more-text">加载更多结果</span>
@@ -147,7 +147,6 @@
     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
         <div id="modal-overlay" class="absolute inset-0 bg-black/70 fade-in-bg"></div>
         <div id="modal-content" class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden modal-enter">
-            <!-- 修复：加入最小高度 min-h-[300px] 防止加载时闪烁，并加入 loader -->
             <div class="w-full md:w-3/5 bg-slate-100 flex items-center justify-center p-4 relative min-h-[300px]">
                 <div id="modal-img-loader" class="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
                     <i data-lucide="loader-2" class="w-10 h-10 text-blue-500 animate-spin"></i>
@@ -155,7 +154,6 @@
                 <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-20 bg-white/50 rounded-full p-1">
                     <i data-lucide="x" class="w-7 h-7"></i>
                 </button>
-                <!-- 修复：加入 relative z-20 opacity-0 配合 JS 做淡入效果 -->
                 <img id="modal-image" src="" alt="详情图片" class="max-w-full max-h-[40vh] md:max-h-[80vh] object-contain relative z-20 opacity-0 transition-opacity duration-300">
             </div>
             <div class="w-full md:w-2/5 p-8 overflow-y-auto">
@@ -200,16 +198,17 @@
             nextCursor: null,
             nextOffset: 0,
             hasMore: false,
-            loadedCount: 0 // 新增：记录已加载的总数量
+            loadedCount: 0,
+            isShowingRecent: false, // 新增状态标记
+            cachedRecentUpdates: null // 🌟 新增：用于在前端缓存最近更新的数据，实现0延迟切换
         };
         
-        // 健壮性增强：防止网络请求竞态条件
         let searchAbortController = null;
         let suggestAbortController = null;
 
         const els = {
             searchInput: document.getElementById('search-input'),
-            visualPrefix: document.getElementById('visual-prefix'), // 新增：视觉前缀
+            visualPrefix: document.getElementById('visual-prefix'),
             clearBtn: document.getElementById('clear-btn'),
             searchBtn: document.getElementById('search-btn'),
             gallery: document.getElementById('gallery'),
@@ -221,6 +220,7 @@
             loadMoreText: document.getElementById('load-more-text'),
             loadMoreIcon: document.getElementById('load-more-icon'),
             resultsCount: document.getElementById('results-count-container'),
+            recentTitle: document.getElementById('recent-title'), // 新增
             validationMsg: document.getElementById('search-validation-msg'),
             prefixToggle: document.getElementById('prefix-toggle'),
             prefixContainer: document.getElementById('prefix-toggle-container'),
@@ -230,7 +230,6 @@
             viewerImg: document.getElementById('viewer-image')
         };
 
-        // 安全性增强：防御 XSS 跨站脚本攻击
         const escapeHTML = (str) => {
             if (!str) return '';
             return str.replace(/[&<>'"]/g, tag => ({
@@ -248,16 +247,14 @@
                 <i data-lucide="${icon}" class="w-12 h-12 ${type === 'loading' ? 'animate-spin' : ''} ${color}"></i>
                 <p class="mt-4 text-lg text-center">${escapeHTML(message)}</p>
             </div>`;
-            lucide.createIcons({ root: els.galleryMsg }); // 局部渲染优化
+            lucide.createIcons({ root: els.galleryMsg });
         }
 
-        // 获取真实的、将要发送给接口的查询词
         function getEffectiveQuery() {
             let val = els.searchInput.value.trim();
-            // 如果用户无意中手动输入了 "XC" (例如复制粘贴)，智能清理掉，保持逻辑一致性
             if (state.searchType === 'id' && state.isPrefixEnabled && val.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX)) {
                 val = val.substring(CONFIG.DEFAULT_PREFIX.length);
-                els.searchInput.value = val; // 修正用户的输入框显示
+                els.searchInput.value = val;
             }
             if (state.searchType === 'id' && state.isPrefixEnabled) {
                 return val ? CONFIG.DEFAULT_PREFIX + val : '';
@@ -271,7 +268,6 @@
             let msg = "";
 
             if (state.searchType === 'id' && val.length > 0) {
-                // 因为前缀变成了视觉显示，这里的校验逻辑只需要看用户输入的数字长度
                 if (val.length < 2) {
                     isValid = false;
                     msg = `编号搜索必须输入至少两位字符`;
@@ -294,20 +290,20 @@
             els.clearBtn.classList.toggle('hidden', els.searchInput.value === '');
         }
 
-        // UI 状态更新：根据设置切换视觉前缀和输入框样式
         function updatePrefixUI() {
             const showPrefix = state.searchType === 'id' && state.isPrefixEnabled;
             if (showPrefix) {
                 els.visualPrefix.classList.remove('hidden');
-                els.searchInput.classList.replace('pl-12', 'pl-16'); // 为前缀留出空间
+                els.searchInput.classList.replace('pl-12', 'pl-16');
             } else {
                 els.visualPrefix.classList.add('hidden');
-                els.searchInput.classList.replace('pl-16', 'pl-12'); // 恢复普通间距
+                els.searchInput.classList.replace('pl-16', 'pl-12');
             }
         }
 
         function renderCards(images, append = false) {
             if (!append) els.gallery.innerHTML = '';
+            els.galleryMsg.innerHTML = ''; // 清除消息
             
             const fragment = document.createDocumentFragment();
             images.forEach((img) => {
@@ -317,16 +313,21 @@
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400';
                 card.style.animation = `popIn 0.5s ease-out forwards`;
-                card.tabIndex = 0; // 交互逻辑增强：支持无障碍键盘操作
+                card.tabIndex = 0;
                 
-                // 将完整数据存入 dataset，经过 escapeHTML 处理防止 XSS
                 card.dataset.original = originalUrl;
                 card.dataset.displayName = escapeHTML(img.displayName);
                 card.dataset.productName = escapeHTML(img.productName);
                 card.dataset.description = escapeHTML(img.description || '正在完善中....');
 
+                // 如果是“最近更新”状态，在图片右上角加个 NEW 标签
+                const newBadge = state.isShowingRecent 
+                    ? `<div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10">NEW</div>`
+                    : '';
+
                 card.innerHTML = `
                     <div class="relative aspect-square bg-slate-100 overflow-hidden">
+                        ${newBadge}
                         <div class="absolute inset-0 image-placeholder"><i data-lucide="image" class="w-8 h-8 text-slate-300"></i></div>
                         <img src="${thumb}" loading="lazy" class="w-full h-full object-cover opacity-0 transition-opacity duration-500">
                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><p class="text-white font-bold text-lg">查看详情</p></div>
@@ -336,16 +337,52 @@
                 const imgEl = card.querySelector('img');
                 imgEl.onload = () => { imgEl.style.opacity = '1'; card.querySelector('.image-placeholder').style.display = 'none'; };
                 
-                // 修复：删除极其消耗带宽的“鼠标悬停预加载大图”逻辑，防止网络请求通道被塞满
-                // (删除了原有的 preloadTimer 和 mouseenter/mouseleave 监听器)
-
-                // 键盘支持
                 card.addEventListener('keydown', (e) => { if (e.key === 'Enter') card.click(); });
                 
                 fragment.appendChild(card);
             });
             els.gallery.appendChild(fragment);
-            lucide.createIcons({ root: els.gallery }); // 性能优化：局部渲染新增节点的图标
+            lucide.createIcons({ root: els.gallery });
+        }
+
+        // --- 新增：加载最近更新的数据 ---
+        async function loadRecentUpdates() {
+            state.isLoading = true;
+            state.isShowingRecent = true;
+            els.recentTitle.classList.remove('hidden'); // 显示最近更新标题
+            els.resultsCount.classList.add('hidden'); // 隐藏搜索数量
+            
+            // 🌟 新增：如果前端缓存里已经有了数据，直接使用，瞬间渲染，不再请求后端
+            if (state.cachedRecentUpdates) {
+                renderCards(state.cachedRecentUpdates, false);
+                state.isLoading = false;
+                return;
+            }
+
+            if (searchAbortController) searchAbortController.abort();
+            searchAbortController = new AbortController();
+
+            showMessage('loading', '正在获取最近收录的产品...');
+
+            try {
+                const resp = await fetch(`${CONFIG.API_WORKER_URL}/recent?limit=12`, { signal: searchAbortController.signal });
+                const data = await resp.json();
+
+                if (data.success && data.images && data.images.length > 0) {
+                    state.cachedRecentUpdates = data.images; // 🌟 新增：将请求到的首屏数据存入缓存
+                    renderCards(data.images, false);
+                } else {
+                    showMessage('info', '暂无最近更新记录，请使用上方搜索框进行查询。');
+                    els.recentTitle.classList.add('hidden');
+                }
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+                showMessage('error', '加载最近更新失败，请重试');
+            } finally {
+                if (!searchAbortController.signal.aborted) {
+                    state.isLoading = false;
+                }
+            }
         }
 
         async function performSearch(isLoadMore = false) {
@@ -353,13 +390,14 @@
             const effectiveQuery = getEffectiveQuery();
             
             if (!effectiveQuery || (state.isPrefixEnabled && state.searchType === 'id' && effectiveQuery === CONFIG.DEFAULT_PREFIX)) {
-                if (!isLoadMore) showMessage('info', '请输入关键词开始搜索。');
+                if (!isLoadMore) loadRecentUpdates(); // 如果没输入内容，回退到展示最新更新
                 return;
             }
 
             state.isLoading = true;
+            state.isShowingRecent = false;
+            els.recentTitle.classList.add('hidden'); // 隐藏最近更新标题
 
-            // 健壮性增强：中断旧的未决请求
             if (searchAbortController) searchAbortController.abort();
             searchAbortController = new AbortController();
 
@@ -383,11 +421,10 @@
 
                 if (data.success) {
                     if (!isLoadMore) {
-                        els.galleryMsg.innerHTML = '';
-                        state.loadedCount = 0; // 修复：新搜索时重置计数
+                        state.loadedCount = 0;
                     }
                     
-                    state.loadedCount += data.images.length; // 累加当前加载的数量
+                    state.loadedCount += data.images.length;
                     renderCards(data.images, isLoadMore);
                     
                     state.hasMore = data.hasMore;
@@ -397,7 +434,6 @@
                     els.loadMoreContainer.classList.toggle('hidden', !state.hasMore);
                     
                     if (state.loadedCount > 0) {
-                        // 修复：动态文案，消除数量歧义
                         let countText = state.hasMore 
                             ? `已加载 ${state.loadedCount} 个结果，可继续下拉加载...` 
                             : `共为您找到 ${state.loadedCount} 个结果`;
@@ -412,10 +448,9 @@
                     showMessage('error', data.error || '未找到结果');
                 }
             } catch (e) {
-                if (e.name === 'AbortError') return; // 忽略被主动中断的请求错误
+                if (e.name === 'AbortError') return;
                 showMessage('error', '连接服务器失败');
             } finally {
-                // 如果这是当前正在运行的最新请求，才解除 loading 状态
                 if (!searchAbortController.signal.aborted) {
                     state.isLoading = false;
                     els.loadMoreBtn.disabled = false;
@@ -443,7 +478,6 @@
                             const li = document.createElement('li');
                             li.className = 'px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors border-b border-slate-50 last:border-0';
                             
-                            // 显示时，如果开启了前缀且接口返回包含了该前缀，为了体验一致性，我们把前缀剥离展示给用户
                             let displayText = escapeHTML(s);
                             if (state.isPrefixEnabled && s.startsWith(CONFIG.DEFAULT_PREFIX)) {
                                 displayText = escapeHTML(s.substring(CONFIG.DEFAULT_PREFIX.length));
@@ -452,7 +486,7 @@
                             
                             li.addEventListener('mousedown', (e) => {
                                 e.preventDefault();
-                                els.searchInput.value = displayText; // 只填入用户视角关注的内容
+                                els.searchInput.value = displayText;
                                 els.suggestionsBox.classList.add('hidden');
                                 checkValidation();
                                 performSearch(false);
@@ -464,15 +498,11 @@
                         els.suggestionsBox.classList.add('hidden');
                     }
                 }
-            } catch (e) {
-                // Ignore AbortError
-            }
+            } catch (e) {}
         }
 
-        // --- 事件绑定全部转为 addEventListener ---
-        
         els.searchInput.addEventListener('input', () => {
-            getEffectiveQuery(); // 触发潜在的手动清理逻辑 (粘贴了包含XC的文本时)
+            getEffectiveQuery();
             checkValidation();
             updateClearBtnVisibility();
             
@@ -494,11 +524,13 @@
             checkValidation();
             updateClearBtnVisibility();
             
-            if (searchAbortController) searchAbortController.abort(); // 中断可能正在进行的搜索
+            if (searchAbortController) searchAbortController.abort();
             state.isLoading = false;
             
             els.suggestionsBox.classList.add('hidden');
-            showMessage('info', '请选择搜索类型，然后输入关键词。'); // 修复：清空时恢复默认界面（内部会自动隐藏统计和按钮）
+            
+            // 修复：清空搜索框后，重新展示最近更新的数据
+            loadRecentUpdates();
             els.searchInput.focus();
         });
 
@@ -517,45 +549,38 @@
             updateClearBtnVisibility();
             
             els.suggestionsBox.classList.add('hidden');
-            showMessage('info', '请选择搜索类型，然后输入关键词。'); // 修复：切换类型时也彻底恢复默认界面
             
+            // 切换类型时也展示最近更新
             if (searchAbortController) searchAbortController.abort();
-            state.isLoading = false;
+            loadRecentUpdates();
         });
 
         els.prefixToggle.addEventListener('change', () => {
             state.isPrefixEnabled = els.prefixToggle.checked;
             updatePrefixUI();
-            
-            // 如果存在搜索值，重新触发验证
             checkValidation();
             updateClearBtnVisibility();
             els.searchInput.focus();
         });
 
-        // 点击外部关闭建议框
         document.addEventListener('click', (e) => {
             if (!document.getElementById('search-container').contains(e.target)) {
                 els.suggestionsBox.classList.add('hidden');
             }
         });
 
-        // 详情弹窗逻辑
         els.gallery.addEventListener('click', (e) => {
             const card = e.target.closest('.group');
             if (!card) return;
             
             const originalUrl = card.dataset.original;
-            
-            // 修复：弹窗使用 1200px 尺寸的高清图进行展示，极速加载。不再直接拉取体积巨大的原图
             const modalOptimizedUrl = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=1200,fit=scale-down,format=auto,quality=85/${originalUrl}`;
             
-            // 重置状态：隐藏图片，显示 Loading 动画
             els.modalImg.classList.add('opacity-0');
             document.getElementById('modal-img-loader').classList.remove('hidden');
             
             els.modalImg.src = modalOptimizedUrl; 
-            els.modalImg.dataset.fullOrigin = originalUrl; // 把真实的巨型原图地址存起来，等用户点全屏放大时再用
+            els.modalImg.dataset.fullOrigin = originalUrl;
 
             document.getElementById('modal-title').innerHTML = card.dataset.displayName;
             document.getElementById('modal-product-name').innerHTML = card.dataset.productName;
@@ -565,7 +590,6 @@
             document.body.classList.add('no-scroll');
         });
 
-        // 新增：监听弹窗图片加载完成，隐藏 loader 并淡入图片
         els.modalImg.onload = () => {
             els.modalImg.classList.remove('opacity-0');
             document.getElementById('modal-img-loader').classList.add('hidden');
@@ -576,7 +600,6 @@
         document.getElementById('modal-close-btn').addEventListener('click', closeModal);
         
         els.modalImg.addEventListener('click', () => {
-            // 修复：只有当用户明确点击要全屏看细节时，才真正去加载那张十几MB的原图
             els.viewerImg.src = els.modalImg.dataset.fullOrigin || els.modalImg.src;
             els.viewer.classList.remove('hidden');
         });
@@ -594,8 +617,10 @@
 
         // --- 初始化 ---
         lucide.createIcons();
-        showMessage('info', '请选择搜索类型，然后输入关键词。');
         updatePrefixUI();
+        
+        // 关键改动：一打开页面，默认直接加载“最近更新”
+        loadRecentUpdates();
         
     });
     </script>
