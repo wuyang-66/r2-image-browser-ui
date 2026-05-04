@@ -23,7 +23,7 @@
         .no-scroll { overflow: hidden; }
 
         .image-placeholder {
-            background-color: #f1f5f9; /* 调浅背景色，配合动画更好看 */
+            background-color: #e2e8f0;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -150,7 +150,7 @@
                 <div id="modal-img-loader" class="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
                     <i data-lucide="loader-2" class="w-10 h-10 text-blue-500 animate-spin"></i>
                 </div>
-                <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-30 bg-white/80 shadow-sm rounded-full p-1">
+                <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-20 bg-white/50 rounded-full p-1">
                     <i data-lucide="x" class="w-7 h-7"></i>
                 </button>
                 <img id="modal-image" src="" alt="详情图片" class="max-w-full max-h-[40vh] md:max-h-[80vh] object-contain relative z-20 opacity-0 transition-opacity duration-300">
@@ -185,19 +185,53 @@
             API_WORKER_URL: "https://xiaowuyang.dpdns.org",
             R2_BUCKET_URL: "https://xiaowuya.dpdns.org",
             PAGE_LIMIT: 12,
-            DEFAULT_PREFIX: "XC"
+            DEFAULT_PREFIX: "XC",
+            MAX_CACHE_SIZE: 30 // 🌟 设置最大缓存条数，防止占用过多内存
         };
+
+        // 🌟 引入前端内存缓存模块 (LRU 机制)
+        const Cache = {
+            store: new Map(),
+            
+            // 获取缓存键：区分搜索类型和关键词
+            getKey: (type, query) => `${type}_${query.toLowerCase()}`,
+            
+            get: (type, query) => {
+                const key = Cache.getKey(type, query);
+                if (Cache.store.has(key)) {
+                    // 如果被访问到了，把它移到最后面（表示最近使用过）
+                    const value = Cache.store.get(key);
+                    Cache.store.delete(key);
+                    Cache.store.set(key, value);
+                    return value;
+                }
+                return null;
+            },
+            
+            set: (type, query, data) => {
+                const key = Cache.getKey(type, query);
+                // 如果超过最大缓存数，删掉最老的那一个（Map 的第一项）
+                if (Cache.store.size >= CONFIG.MAX_CACHE_SIZE) {
+                    const firstKey = Cache.store.keys().next().value;
+                    Cache.store.delete(firstKey);
+                }
+                Cache.store.set(key, data);
+            },
+            
+            clear: () => Cache.store.clear()
+        };
+
         const state = { 
             debounceTimer: null, 
             isPrefixEnabled: true, 
             searchType: 'id',
             isValid: true,
             isLoading: false,
-            nextCursor: null, // 恢复优雅的单一 cursor 管理，它现在接收后端传来的 JSON 字符串
+            nextCursor: null,
             nextOffset: 0,
             hasMore: false,
             loadedCount: 0,
-            isShowingRecent: false, 
+            isShowingRecent: false,
             cachedRecentUpdates: null 
         };
         
@@ -248,13 +282,25 @@
             lucide.createIcons({ root: els.galleryMsg });
         }
 
+        function getEffectiveQuery() {
+            let val = els.searchInput.value.trim();
+            if (state.searchType === 'id' && state.isPrefixEnabled && val.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX)) {
+                val = val.substring(CONFIG.DEFAULT_PREFIX.length);
+                els.searchInput.value = val;
+            }
+            if (state.searchType === 'id' && state.isPrefixEnabled) {
+                return val ? CONFIG.DEFAULT_PREFIX + val : '';
+            }
+            return val;
+        }
+
         function checkValidation() {
-            const val = els.searchInput.value.replace(/\s+/g, '');
+            const val = els.searchInput.value.trim();
             let isValid = true;
             let msg = "";
 
             if (state.searchType === 'id' && val.length > 0) {
-                if (val.length < 2 && !state.isPrefixEnabled) {
+                if (val.length < 2) {
                     isValid = false;
                     msg = `编号搜索必须输入至少两位字符`;
                 }
@@ -289,12 +335,11 @@
 
         function renderCards(images, append = false) {
             if (!append) els.gallery.innerHTML = '';
-            els.galleryMsg.innerHTML = '';
+            els.galleryMsg.innerHTML = ''; 
             
             const fragment = document.createDocumentFragment();
             images.forEach((img) => {
                 const originalUrl = `${CONFIG.R2_BUCKET_URL}/${img.key}`;
-                // cdn-cgi 保留 format=auto，让 Cloudflare 自动根据浏览器支持分发 WebP/AVIF
                 const thumb = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=400,height=400,fit=cover,format=auto,quality=75/${originalUrl}`;
                 
                 const card = document.createElement('div');
@@ -311,9 +356,6 @@
                     ? `<div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10">NEW</div>`
                     : '';
 
-                // 🌟 前端核心优化点：
-                // 1. placeholder 加入了 animate-pulse (骨架屏呼吸动画)
-                // 2. img 标签加入了 decoding="async" (异步解码，不卡死主页面)
                 card.innerHTML = `
                     <div class="relative aspect-square bg-slate-100 overflow-hidden">
                         ${newBadge}
@@ -334,11 +376,43 @@
             lucide.createIcons({ root: els.gallery });
         }
 
+        // --- 处理查询结果展示的统一方法 ---
+        function handleSearchResults(data, isLoadMore) {
+             if (data.success) {
+                if (!isLoadMore) {
+                    state.loadedCount = 0;
+                }
+                
+                state.loadedCount += data.images.length;
+                renderCards(data.images, isLoadMore);
+                
+                state.hasMore = data.hasMore;
+                state.nextCursor = data.nextCursor;
+                state.nextOffset = data.nextOffset;
+
+                els.loadMoreContainer.classList.toggle('hidden', !state.hasMore);
+                
+                if (state.loadedCount > 0) {
+                    let countText = state.hasMore 
+                        ? `已加载 ${state.loadedCount} 个结果，可继续下拉加载...` 
+                        : `共为您找到 ${state.loadedCount} 个结果`;
+                        
+                    els.resultsCount.innerHTML = `<div class="flex items-center text-sm text-slate-500"><i data-lucide="check-circle-2" class="w-4 h-4 mr-2 text-teal-500"></i>${countText}</div>`;
+                    els.resultsCount.classList.remove('hidden');
+                    lucide.createIcons({ root: els.resultsCount });
+                } else if (!isLoadMore && data.images.length === 0) {
+                    showMessage('error', '未找到结果');
+                }
+            } else {
+                showMessage('error', data.error || '未找到结果');
+            }
+        }
+
         async function loadRecentUpdates() {
             state.isLoading = true;
             state.isShowingRecent = true;
-            els.recentTitle.classList.remove('hidden');
-            els.resultsCount.classList.add('hidden');
+            els.recentTitle.classList.remove('hidden'); 
+            els.resultsCount.classList.add('hidden'); 
             
             if (state.cachedRecentUpdates) {
                 renderCards(state.cachedRecentUpdates, false);
@@ -356,7 +430,7 @@
                 const data = await resp.json();
 
                 if (data.success && data.images && data.images.length > 0) {
-                    state.cachedRecentUpdates = data.images;
+                    state.cachedRecentUpdates = data.images; 
                     renderCards(data.images, false);
                 } else {
                     showMessage('info', '暂无最近更新记录，请使用上方搜索框进行查询。');
@@ -372,17 +446,30 @@
             }
         }
 
-        // 恢复单一优雅查询，脏活全扔给后端
         async function performSearch(isLoadMore = false) {
             if (!state.isValid || state.isLoading) return;
+            const effectiveQuery = getEffectiveQuery();
             
-            let rawInput = els.searchInput.value;
-            // 依然自动清理输入框内手滑打入的多余空格，提升体验
-            let cleanInput = state.searchType === 'id' ? rawInput.replace(/\s+/g, '') : rawInput.trim();
-            
-            if (!cleanInput) {
+            if (!effectiveQuery || (state.isPrefixEnabled && state.searchType === 'id' && effectiveQuery === CONFIG.DEFAULT_PREFIX)) {
                 if (!isLoadMore) loadRecentUpdates();
                 return;
+            }
+
+            // 🌟 核心缓存逻辑：如果不是加载下一页，并且在缓存中找到了这个搜索词，瞬间渲染！
+            if (!isLoadMore) {
+                const cachedData = Cache.get(state.searchType, effectiveQuery);
+                if (cachedData) {
+                    state.isShowingRecent = false;
+                    els.recentTitle.classList.add('hidden');
+                    
+                    // 重置分页状态，直接使用缓存数据
+                    state.nextCursor = null;
+                    state.nextOffset = 0;
+                    
+                    // 模拟从后端收到数据，调用统一处理函数
+                    handleSearchResults(cachedData, false);
+                    return; 
+                }
             }
 
             state.isLoading = true;
@@ -393,9 +480,9 @@
             searchAbortController = new AbortController();
 
             if (!isLoadMore) {
-                state.nextCursor = null; 
+                state.nextCursor = null;
                 state.nextOffset = 0;
-                showMessage('loading', `正在搜索...`);
+                showMessage('loading', `正在搜索 "${effectiveQuery}"...`);
             } else {
                 els.loadMoreBtn.disabled = true;
                 els.loadMoreIcon.classList.add('animate-spin');
@@ -403,52 +490,20 @@
             }
 
             try {
-                // 判断是否需要带上前缀请求后端
-                let queryStr = cleanInput;
-                if (state.searchType === 'id') {
-                    let upperPrefix = CONFIG.DEFAULT_PREFIX.toUpperCase();
-                    if (state.isPrefixEnabled && !cleanInput.toUpperCase().startsWith(upperPrefix)) {
-                        queryStr = CONFIG.DEFAULT_PREFIX + cleanInput;
-                    }
-                }
-
-                // 前端只需发送最原始的一个请求即可
-                let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(queryStr)}&type=${state.searchType}&limit=${CONFIG.PAGE_LIMIT}`;
+                let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(effectiveQuery)}&type=${state.searchType}&limit=${CONFIG.PAGE_LIMIT}`;
                 if (state.searchType === 'name') url += `&offset=${state.nextOffset}`;
-                else if (state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`; // 将后端传来的打包游标原样传回去
-                
+                else if (state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
+
                 const resp = await fetch(url, { signal: searchAbortController.signal });
                 const data = await resp.json();
-                
-                if (data.success) {
-                    if (!isLoadMore) {
-                        state.loadedCount = 0;
-                    }
-                    
-                    state.loadedCount += data.images.length;
-                    renderCards(data.images, isLoadMore);
-                    
-                    state.hasMore = data.hasMore;
-                    state.nextCursor = data.nextCursor;
-                    state.nextOffset = data.nextOffset;
 
-                    els.loadMoreContainer.classList.toggle('hidden', !state.hasMore);
-                    
-                    if (state.loadedCount > 0) {
-                        let countText = state.hasMore 
-                            ? `已加载 ${state.loadedCount} 个结果，可继续下拉加载...` 
-                            : `共为您找到 ${state.loadedCount} 个结果`;
-                            
-                        els.resultsCount.innerHTML = `<div class="flex items-center text-sm text-slate-500"><i data-lucide="check-circle-2" class="w-4 h-4 mr-2 text-teal-500"></i>${countText}</div>`;
-                        els.resultsCount.classList.remove('hidden');
-                        lucide.createIcons({ root: els.resultsCount });
-                    } else if (!isLoadMore && data.images.length === 0) {
-                        showMessage('error', '未找到结果');
-                    }
-                } else {
-                    showMessage('error', data.error || '未找到结果');
+                // 🌟 将成功的首屏搜索结果存入前端字典
+                if (data.success && !isLoadMore) {
+                    Cache.set(state.searchType, effectiveQuery, data);
                 }
-                
+
+                handleSearchResults(data, isLoadMore);
+
             } catch (e) {
                 if (e.name === 'AbortError') return;
                 showMessage('error', '连接服务器失败');
@@ -462,18 +517,15 @@
             }
         }
 
-        async function fetchSuggestions() {
-            if (state.searchType !== 'id' || !state.isValid) return;
-            
-            let cleanInput = els.searchInput.value.replace(/\s+/g, '');
-            if (!cleanInput) return;
+        async function fetchSuggestions(query) {
+            if (!query || state.searchType !== 'id' || !state.isValid) return;
+            const effectiveQuery = getEffectiveQuery();
 
             if (suggestAbortController) suggestAbortController.abort();
             suggestAbortController = new AbortController();
 
             try {
-                let query = state.isPrefixEnabled ? CONFIG.DEFAULT_PREFIX + cleanInput : cleanInput;
-                const response = await fetch(`${CONFIG.API_WORKER_URL}/suggest?q=${encodeURIComponent(query)}`, { signal: suggestAbortController.signal });
+                const response = await fetch(`${CONFIG.API_WORKER_URL}/suggest?q=${encodeURIComponent(effectiveQuery)}`, { signal: suggestAbortController.signal });
                 const data = await response.json();
                 
                 if (data.success && data.suggestions) {
@@ -484,20 +536,16 @@
                             li.className = 'px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors border-b border-slate-50 last:border-0';
                             
                             let displayText = escapeHTML(s);
-                            let displayPrefix = CONFIG.DEFAULT_PREFIX;
-                            
-                            if (state.isPrefixEnabled && s.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX.toUpperCase())) {
-                                displayPrefix = s.substring(0, CONFIG.DEFAULT_PREFIX.length);
+                            if (state.isPrefixEnabled && s.startsWith(CONFIG.DEFAULT_PREFIX)) {
                                 displayText = escapeHTML(s.substring(CONFIG.DEFAULT_PREFIX.length));
                             }
-                            
-                            li.innerHTML = `<span class="text-slate-400 font-medium">${state.isPrefixEnabled ? escapeHTML(displayPrefix) : ''}</span>${displayText}`;
+                            li.innerHTML = `<span class="text-slate-400 font-medium">${state.isPrefixEnabled ? CONFIG.DEFAULT_PREFIX : ''}</span>${displayText}`;
                             
                             li.addEventListener('mousedown', (e) => {
                                 e.preventDefault();
-                                els.searchInput.value = s; 
+                                els.searchInput.value = displayText;
                                 els.suggestionsBox.classList.add('hidden');
-                                els.searchInput.dispatchEvent(new Event('input'));
+                                checkValidation();
                                 performSearch(false);
                             });
                             els.suggestionsList.appendChild(li);
@@ -510,29 +558,14 @@
             } catch (e) {}
         }
 
-        // 优化视觉体验：如果你手打了 xc，它会平滑吸附到视觉前缀上
         els.searchInput.addEventListener('input', () => {
-            let rawVal = els.searchInput.value;
-            
-            if (state.searchType === 'id' && state.isPrefixEnabled) {
-                let trimmed = rawVal.trimStart();
-                let upperPrefix = CONFIG.DEFAULT_PREFIX.toUpperCase();
-                
-                if (trimmed.toUpperCase().startsWith(upperPrefix)) {
-                    let actualPrefix = trimmed.substring(0, upperPrefix.length);
-                    els.visualPrefix.textContent = actualPrefix;
-                    els.searchInput.value = trimmed.substring(upperPrefix.length).trimStart();
-                } else if (els.searchInput.value === '') {
-                    els.visualPrefix.textContent = CONFIG.DEFAULT_PREFIX;
-                }
-            }
-            
+            getEffectiveQuery();
             checkValidation();
             updateClearBtnVisibility();
             
             clearTimeout(state.debounceTimer);
             state.debounceTimer = setTimeout(() => {
-                fetchSuggestions();
+                fetchSuggestions(els.searchInput.value.trim());
             }, 300);
         });
 
@@ -545,7 +578,6 @@
 
         els.clearBtn.addEventListener('click', () => {
             els.searchInput.value = '';
-            els.visualPrefix.textContent = CONFIG.DEFAULT_PREFIX;
             checkValidation();
             updateClearBtnVisibility();
             
@@ -569,7 +601,6 @@
             
             updatePrefixUI();
             els.searchInput.value = '';
-            els.visualPrefix.textContent = CONFIG.DEFAULT_PREFIX;
             checkValidation();
             updateClearBtnVisibility();
             
