@@ -23,7 +23,7 @@
         .no-scroll { overflow: hidden; }
 
         .image-placeholder {
-            background-color: #e2e8f0;
+            background-color: #f1f5f9; /* 调浅背景色，配合动画更好看 */
             display: flex;
             align-items: center;
             justify-content: center;
@@ -294,6 +294,7 @@
             const fragment = document.createDocumentFragment();
             images.forEach((img) => {
                 const originalUrl = `${CONFIG.R2_BUCKET_URL}/${img.key}`;
+                // cdn-cgi 保留 format=auto，让 Cloudflare 自动根据浏览器支持分发 WebP/AVIF
                 const thumb = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=400,height=400,fit=cover,format=auto,quality=75/${originalUrl}`;
                 
                 const card = document.createElement('div');
@@ -310,11 +311,14 @@
                     ? `<div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10">NEW</div>`
                     : '';
 
+                // 🌟 前端核心优化点：
+                // 1. placeholder 加入了 animate-pulse (骨架屏呼吸动画)
+                // 2. img 标签加入了 decoding="async" (异步解码，不卡死主页面)
                 card.innerHTML = `
                     <div class="relative aspect-square bg-slate-100 overflow-hidden">
                         ${newBadge}
-                        <div class="absolute inset-0 image-placeholder"><i data-lucide="image" class="w-8 h-8 text-slate-300"></i></div>
-                        <img src="${thumb}" loading="lazy" class="w-full h-full object-cover opacity-0 transition-opacity duration-500">
+                        <div class="absolute inset-0 image-placeholder animate-pulse"><i data-lucide="image" class="w-8 h-8 text-slate-300"></i></div>
+                        <img src="${thumb}" loading="lazy" decoding="async" class="w-full h-full object-cover opacity-0 transition-opacity duration-500">
                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><p class="text-white font-bold text-lg">查看详情</p></div>
                     </div>
                     <div class="p-3 bg-slate-50"><p class="text-sm font-semibold text-slate-600 text-center truncate">${card.dataset.productName}</p><p class="text-xs text-slate-400 text-center mt-1">${card.dataset.displayName}</p></div>
