@@ -90,9 +90,7 @@
 
     <!-- 顶部工具栏 -->
     <div class="fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-md border-b border-slate-200 z-40 flex items-center justify-between px-4 sm:px-6">
-        <!-- 左侧：首页与我的收藏 -->
         <div class="flex items-center space-x-2">
-            <!-- 🌟 新增返回首页按钮 -->
             <button id="nav-home-btn" class="flex items-center space-x-1 text-slate-600 hover:text-blue-500 transition-colors bg-slate-100 hover:bg-blue-50 px-3 py-1.5 rounded-full font-medium text-sm">
                 <i data-lucide="home" class="w-4 h-4"></i>
                 <span class="hidden sm:inline">首页</span>
@@ -104,7 +102,6 @@
             </button>
         </div>
         
-        <!-- 右侧：身份信息 -->
         <div class="font-bold text-slate-600 truncate cursor-pointer hover:text-blue-500 transition-colors flex items-center bg-slate-50 px-3 py-1.5 rounded-full text-sm border border-slate-200" id="top-bar-username-container">
             <div id="top-bar-username" class="flex items-center">
                 <i data-lucide="user" class="w-4 h-4 mr-1"></i>
@@ -360,6 +357,7 @@
         let suggestAbortController = null;
 
         const els = {
+            searchContainer: document.getElementById('search-container'),
             searchInput: document.getElementById('search-input'),
             visualPrefix: document.getElementById('visual-prefix'),
             clearBtn: document.getElementById('clear-btn'),
@@ -383,6 +381,13 @@
             viewerImg: document.getElementById('viewer-image'),
             syncModal: document.getElementById('sync-modal')
         };
+
+        // --- 全局点击隐藏联想框 ---
+        document.addEventListener('click', (e) => {
+            if (els.searchContainer && !els.searchContainer.contains(e.target)) {
+                els.suggestionsBox.classList.add('hidden');
+            }
+        });
 
         const escapeHTML = (str) => {
             if (!str) return '';
@@ -632,21 +637,13 @@
                         btn.onclick = () => {
                             let searchVal = keyword;
                             
-                            // 🌟 修复热搜点击切换模式的逻辑
                             if (keyword.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX.toUpperCase())) {
-                                // 如果是 XC 开头，切换到编号搜索
                                 const btnId = document.querySelector('[data-type="id"]');
-                                btnId.click(); // 触发点击动画
-                                state.searchType = 'id';
-                                state.isPrefixEnabled = true; // 强制开启前缀（既然没开关了，默认开启）
-                                updatePrefixUI();
+                                btnId.click(); 
                                 searchVal = keyword.substring(CONFIG.DEFAULT_PREFIX.length);
                             } else {
-                                // 🌟 如果不是 XC 开头，严格切换到关键词搜索模式
                                 const btnName = document.querySelector('[data-type="name"]');
-                                btnName.click(); // 触发 UI 切换
-                                state.searchType = 'name'; // 强制更新内部状态
-                                updatePrefixUI(); // 隐藏前缀 UI
+                                btnName.click(); 
                             }
                             
                             els.searchInput.value = searchVal;
@@ -667,6 +664,9 @@
         }
 
         async function performSearch(isLoadMore = false) {
+            // 执行搜索时关闭联想下拉框
+            els.suggestionsBox.classList.add('hidden');
+            
             if (!state.isValid || state.isLoading) return;
             const effectiveQuery = getEffectiveQuery();
             
@@ -734,7 +734,10 @@
         }
 
         async function fetchSuggestions(query) {
-            if (!query || state.searchType !== 'id' || !state.isValid) return;
+            if (!query || state.searchType !== 'id' || !state.isValid) {
+                els.suggestionsBox.classList.add('hidden');
+                return;
+            }
             const effectiveQuery = getEffectiveQuery();
 
             if (suggestAbortController) suggestAbortController.abort();
@@ -775,6 +778,36 @@
         }
 
         // --- 事件监听 ---
+
+        // 🌟 修复搜索模式切换的点击交互，补充缺失逻辑
+        document.querySelectorAll('.search-type-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetBtn = e.target.closest('.search-type-btn');
+                if (targetBtn.classList.contains('active')) return;
+
+                document.querySelectorAll('.search-type-btn').forEach(b => b.classList.remove('active'));
+                targetBtn.classList.add('active');
+                
+                state.searchType = targetBtn.dataset.type;
+                state.isPrefixEnabled = (state.searchType === 'id');
+                
+                els.searchInput.placeholder = state.searchType === 'id' ? "输入编号进行搜索..." : "输入名称/关键词进行搜索...";
+                updatePrefixUI();
+                
+                // 处理已有输入内容，使其适应新的搜索模式
+                let rawVal = els.searchInput.value;
+                if (state.searchType === 'id' && state.isPrefixEnabled) {
+                     let upperPrefix = CONFIG.DEFAULT_PREFIX.toUpperCase();
+                     if (rawVal.toUpperCase().startsWith(upperPrefix)) {
+                         els.searchInput.value = rawVal.substring(upperPrefix.length).trimStart();
+                     }
+                }
+                
+                checkValidation();
+                updateClearBtnVisibility();
+                els.suggestionsBox.classList.add('hidden');
+            });
+        });
         
         els.searchInput.addEventListener('input', () => {
             let rawVal = els.searchInput.value;
@@ -795,11 +828,25 @@
             clearTimeout(state.debounceTimer);
             state.debounceTimer = setTimeout(() => {
                 const val = state.searchType === 'id' ? els.searchInput.value.replace(/\s+/g, '') : els.searchInput.value.trim();
-                fetchSuggestions(val);
+                // 输入为空时自动关闭联想框
+                if (val) {
+                    fetchSuggestions(val);
+                } else {
+                    els.suggestionsBox.classList.add('hidden');
+                }
             }, 300);
         });
 
-        els.searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') performSearch(false); });
+        // 🌟 将原有的 keyup 替换为 keydown 并增加 ESC 按键监听
+        els.searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                performSearch(false);
+            } else if (e.key === 'Escape') {
+                els.suggestionsBox.classList.add('hidden');
+            }
+        });
+        
         els.searchBtn.addEventListener('click', () => performSearch(false));
         els.loadMoreBtn.addEventListener('click', () => performSearch(true));
 
@@ -815,7 +862,6 @@
             els.searchInput.focus();
         });
 
-        // 🌟 修复红心交互逻辑，并增加权限校验与自动同步
         els.gallery.addEventListener('click', (e) => {
             const favBtn = e.target.closest('.fav-btn');
             const card = e.target.closest('.group');
@@ -824,7 +870,6 @@
                 e.stopPropagation(); 
                 e.preventDefault();  
                 
-                // 🌟 新增拦截：如果没有绑定身份，强制弹出绑定窗口并中断操作
                 if (!FavManager.userInfo) {
                     openSyncModal();
                     return;
@@ -855,7 +900,6 @@
                     loadFavoritesView();
                 }
 
-                // 🌟 体验优化：操作完成后自动静默推送到云端，防止数据丢失
                 syncToCloud();
 
                 return;
@@ -902,7 +946,6 @@
             if (e.key === 'Escape') { closeViewer(); closeModal(); }
         });
 
-        // 🌟 绑定回到首页的操作
         document.getElementById('nav-home-btn').addEventListener('click', () => {
             if (state.currentView !== 'recent') {
                 loadRecentUpdates();
@@ -914,11 +957,9 @@
             }
         });
 
-        // 🌟 云同步与身份面板操作
         document.getElementById('top-bar-username-container').addEventListener('click', () => openSyncModal());
         
         document.getElementById('nav-fav-btn').addEventListener('click', () => {
-            // 🌟 新增拦截：点击“我的收藏”时，如果没有绑定身份，直接弹窗
             if (!FavManager.userInfo) {
                 openSyncModal();
                 return;
