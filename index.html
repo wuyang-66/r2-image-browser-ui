@@ -70,7 +70,7 @@
         #suggestions-box::-webkit-scrollbar-track { background: #f1f5f9; }
         #suggestions-box::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
-        /* 收藏按钮样式 */
+        /* 收藏按钮样式优化：针对 SVG 设置变红 */
         .fav-btn {
             position: absolute;
             top: 8px;
@@ -83,24 +83,40 @@
             transition: all 0.2s;
         }
         .fav-btn:hover { background: #fff; transform: scale(1.1); }
-        .fav-btn.active i { fill: #ef4444; color: #ef4444; }
+        .fav-btn.active svg { fill: #ef4444; color: #ef4444; }
     </style>
 </head>
 <body class="antialiased text-slate-800">
 
     <!-- 顶部工具栏 -->
     <div class="fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-md border-b border-slate-200 z-40 flex items-center justify-between px-4 sm:px-6">
-        <div class="font-bold text-slate-700 truncate" id="top-bar-username">未绑定身份</div>
-        <button id="nav-fav-btn" class="flex items-center space-x-2 text-slate-600 hover:text-red-500 transition-colors bg-slate-100 hover:bg-red-50 px-3 py-1.5 rounded-full font-medium text-sm">
-            <i data-lucide="heart" class="w-4 h-4"></i>
-            <span>我的收藏</span>
-            <span id="fav-count-badge" class="bg-slate-200 text-slate-600 rounded-full px-2 py-0.5 text-xs">0</span>
-        </button>
+        <!-- 左侧：首页与我的收藏 -->
+        <div class="flex items-center space-x-2">
+            <!-- 🌟 新增返回首页按钮 -->
+            <button id="nav-home-btn" class="flex items-center space-x-1 text-slate-600 hover:text-blue-500 transition-colors bg-slate-100 hover:bg-blue-50 px-3 py-1.5 rounded-full font-medium text-sm">
+                <i data-lucide="home" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">首页</span>
+            </button>
+            <button id="nav-fav-btn" class="flex items-center space-x-2 text-slate-600 hover:text-red-500 transition-colors bg-slate-100 hover:bg-red-50 px-3 py-1.5 rounded-full font-medium text-sm">
+                <i data-lucide="heart" class="w-4 h-4"></i>
+                <span>我的收藏</span>
+                <span id="fav-count-badge" class="bg-slate-200 text-slate-600 rounded-full px-2 py-0.5 text-xs">0</span>
+            </button>
+        </div>
+        
+        <!-- 右侧：身份信息 -->
+        <div class="font-bold text-slate-600 truncate cursor-pointer hover:text-blue-500 transition-colors flex items-center bg-slate-50 px-3 py-1.5 rounded-full text-sm border border-slate-200" id="top-bar-username-container">
+            <div id="top-bar-username" class="flex items-center">
+                <i data-lucide="user" class="w-4 h-4 mr-1"></i>
+                <span>未绑定身份</span>
+            </div>
+            <i data-lucide="edit-3" class="w-3 h-3 ml-2 text-slate-400"></i>
+        </div>
     </div>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 mt-10">
         <header class="text-center mb-8 md:mb-12 pt-4">
-            <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)]">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)] cursor-pointer" id="main-title-logo">
                 迅驰工具在线查询
             </h1>
             <p class="mt-3 text-lg text-slate-500">随时随地查询，实时同步更新</p>
@@ -142,13 +158,11 @@
             </button>
         </div>
 
-        <!-- 🌟 新增的热搜区域 -->
         <div id="hot-searches-container" class="max-w-3xl mx-auto mt-4 hidden items-center space-x-2 px-2 animate-fade-in">
             <span class="text-sm text-slate-500 flex items-center whitespace-nowrap shrink-0">
                 <i data-lucide="flame" class="w-4 h-4 text-orange-500 mr-1"></i>热门搜索：
             </span>
             <div id="hot-searches-list" class="flex flex-wrap gap-2 items-center">
-                <!-- 热搜关键词会动态插入到这里 -->
             </div>
         </div>
         
@@ -270,7 +284,6 @@
             MAX_CACHE_SIZE: 30 
         };
 
-        // 🌟 收藏夹与身份状态管理
         const FavManager = {
             items: JSON.parse(localStorage.getItem('xc_favorites') || '[]'),
             userInfo: JSON.parse(localStorage.getItem('xc_user_info') || 'null'),
@@ -284,7 +297,7 @@
                 if (index > -1) {
                     this.items.splice(index, 1);
                 } else {
-                    this.items.unshift(imgObj); // 存入完整对象以便离线查看
+                    this.items.unshift(imgObj);
                     isAdded = true;
                 }
                 this.save();
@@ -295,10 +308,11 @@
             
             updateUI() {
                 document.getElementById('fav-count-badge').textContent = this.items.length;
+                const usernameEl = document.getElementById('top-bar-username');
                 if (this.userInfo && this.userInfo.name) {
-                    document.getElementById('top-bar-username').innerHTML = `<i data-lucide="user" class="inline w-4 h-4 mr-1 mb-1"></i>${this.userInfo.name} (已绑定)`;
+                    usernameEl.innerHTML = `<i data-lucide="user-check" class="inline w-4 h-4 mr-1 text-blue-500"></i><span class="text-blue-600">${this.userInfo.name}</span>`;
                 } else {
-                    document.getElementById('top-bar-username').textContent = '未绑定身份';
+                    usernameEl.innerHTML = `<i data-lucide="user" class="inline w-4 h-4 mr-1"></i><span>未绑定身份</span>`;
                 }
                 lucide.createIcons();
             }
@@ -338,7 +352,7 @@
             nextOffset: 0,
             hasMore: false,
             loadedCount: 0,
-            currentView: 'recent', // 'recent', 'search', 'favorites'
+            currentView: 'recent', 
             cachedRecentUpdates: null 
         };
         
@@ -459,11 +473,11 @@
                 card.tabIndex = 0;
                 
                 card.dataset.original = originalUrl;
-                card.dataset.key = img.key; // For favorites
+                card.dataset.key = img.key; 
                 card.dataset.displayName = escapeHTML(img.displayName);
                 card.dataset.productName = escapeHTML(img.productName);
                 card.dataset.description = escapeHTML(img.description || '正在完善中....');
-                card.dataset.uploaded = img.uploaded || ''; // Store for favoriting
+                card.dataset.uploaded = img.uploaded || ''; 
 
                 const isFav = FavManager.isFav(img.key);
                 
@@ -473,7 +487,7 @@
 
                 card.innerHTML = `
                     <button class="fav-btn ${isFav ? 'active' : ''}" title="加入/取消收藏">
-                        <i data-lucide="heart" class="w-5 h-5 text-slate-400"></i>
+                        <i data-lucide="heart" class="w-5 h-5 text-slate-400 transition-colors"></i>
                     </button>
                     <div class="relative aspect-square bg-slate-100 overflow-hidden">
                         ${newBadge}
@@ -528,6 +542,12 @@
         async function loadRecentUpdates() {
             state.isLoading = true;
             state.currentView = 'recent';
+            
+            // 清理搜索状态，回到首页视图
+            els.searchInput.value = '';
+            updateClearBtnVisibility();
+            els.suggestionsBox.classList.add('hidden');
+            
             els.recentTitle.classList.remove('hidden');
             document.getElementById('main-section-icon').setAttribute('data-lucide', 'sparkles');
             document.getElementById('main-section-icon').className = 'w-6 h-6 text-amber-500 mr-2';
@@ -570,7 +590,6 @@
             }
         }
 
-        // 🌟 展示收藏列表
         function loadFavoritesView() {
             state.currentView = 'favorites';
             els.searchInput.value = '';
@@ -677,7 +696,6 @@
             }
 
             try {
-                // 🌟 将用户的名称带入搜索请求中，实名记录日志
                 const userParam = FavManager.userInfo ? `&user=${encodeURIComponent(FavManager.userInfo.name)}` : '';
                 let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(effectiveQuery)}&type=${state.searchType}&limit=${CONFIG.PAGE_LIMIT}${userParam}`;
                 
@@ -788,35 +806,21 @@
             els.searchInput.focus();
         });
 
-        document.getElementById('search-type-switcher').addEventListener('click', (e) => {
-            const btn = e.target.closest('button');
-            if (!btn) return;
-            state.searchType = btn.dataset.type;
-            document.querySelectorAll('.search-type-btn').forEach(b => b.classList.toggle('active', b === btn));
-            els.searchInput.placeholder = state.searchType === 'id' ? '输入编号进行搜索...' : '输入关键词进行搜索...';
-            updatePrefixUI();
-            els.searchInput.value = '';
-            els.visualPrefix.textContent = CONFIG.DEFAULT_PREFIX;
-            checkValidation();
-            updateClearBtnVisibility();
-            els.suggestionsBox.classList.add('hidden');
-            if (searchAbortController) searchAbortController.abort();
-            loadRecentUpdates();
-        });
-
-        document.addEventListener('click', (e) => {
-            if (!document.getElementById('search-container').contains(e.target)) {
-                els.suggestionsBox.classList.add('hidden');
-            }
-        });
-
-        // 🌟 收藏操作与图片详情查看
+        // 🌟 修复红心交互逻辑，并增加权限校验与自动同步
         els.gallery.addEventListener('click', (e) => {
             const favBtn = e.target.closest('.fav-btn');
             const card = e.target.closest('.group');
             
             if (favBtn && card) {
-                e.stopPropagation(); // 阻止打开图片弹窗
+                e.stopPropagation(); 
+                e.preventDefault();  
+                
+                // 🌟 新增拦截：如果没有绑定身份，强制弹出绑定窗口并中断操作
+                if (!FavManager.userInfo) {
+                    openSyncModal();
+                    return;
+                }
+                
                 const imgData = {
                     key: card.dataset.key,
                     displayName: card.dataset.displayName,
@@ -826,17 +830,25 @@
                 };
                 
                 const isAdded = FavManager.toggle(imgData);
-                favBtn.classList.toggle('active', isAdded);
                 
                 if (isAdded) {
-                    favBtn.querySelector('i').classList.add('heart-beat');
-                    setTimeout(() => favBtn.querySelector('i').classList.remove('heart-beat'), 500);
+                    favBtn.classList.add('active');
+                    const icon = favBtn.querySelector('svg'); 
+                    if(icon) {
+                        icon.classList.add('heart-beat');
+                        setTimeout(() => icon.classList.remove('heart-beat'), 500);
+                    }
+                } else {
+                    favBtn.classList.remove('active');
                 }
                 
-                // 如果当前正在“我的收藏”视图，并且取消了收藏，则刷新界面
                 if (state.currentView === 'favorites' && !isAdded) {
                     loadFavoritesView();
                 }
+
+                // 🌟 体验优化：操作完成后自动静默推送到云端，防止数据丢失
+                syncToCloud();
+
                 return;
             }
 
@@ -881,10 +893,29 @@
             if (e.key === 'Escape') { closeViewer(); closeModal(); }
         });
 
-        // 🌟 云同步相关逻辑
-        document.getElementById('top-bar-username').addEventListener('click', () => openSyncModal());
+        // 🌟 绑定回到首页的操作
+        document.getElementById('nav-home-btn').addEventListener('click', () => {
+            if (state.currentView !== 'recent') {
+                loadRecentUpdates();
+            }
+        });
+        document.getElementById('main-title-logo').addEventListener('click', () => {
+            if (state.currentView !== 'recent') {
+                loadRecentUpdates();
+            }
+        });
+
+        // 🌟 云同步与身份面板操作
+        document.getElementById('top-bar-username-container').addEventListener('click', () => openSyncModal());
+        
         document.getElementById('nav-fav-btn').addEventListener('click', () => {
-            if (state.currentView === 'favorites') openSyncModal(); // 如果已经在收藏页，再次点击打开设置
+            // 🌟 新增拦截：点击“我的收藏”时，如果没有绑定身份，直接弹窗
+            if (!FavManager.userInfo) {
+                openSyncModal();
+                return;
+            }
+
+            if (state.currentView === 'favorites') openSyncModal(); 
             else loadFavoritesView();
         });
 
@@ -918,10 +949,11 @@
                 const data = await res.json();
                 if (data.success) {
                     FavManager.saveUser({ name: data.username, code: data.syncCode });
-                    // 如果本地有数据，顺便推送一次
                     if (FavManager.items.length > 0) syncToCloud();
                     openSyncModal();
-                } else { alert(data.error); }
+                } else { 
+                    alert(data.error); 
+                }
             } catch (e) { alert('网络错误，请重试'); } finally {
                 btn.disabled = false; btn.textContent = '生成同步码';
             }
@@ -991,7 +1023,7 @@
         document.getElementById('sync-cloud-btn').addEventListener('click', syncToCloud);
 
         // --- 初始化 ---
-        FavManager.updateUI(); // 初始化身份和角标
+        FavManager.updateUI(); 
         lucide.createIcons();
         updatePrefixUI();
         
