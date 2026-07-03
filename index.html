@@ -631,13 +631,22 @@
                         
                         btn.onclick = () => {
                             let searchVal = keyword;
+                            
+                            // 🌟 修复热搜点击切换模式的逻辑
                             if (keyword.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX.toUpperCase())) {
-                                document.querySelector('[data-type="id"]').click();
-                                state.isPrefixEnabled = true;
+                                // 如果是 XC 开头，切换到编号搜索
+                                const btnId = document.querySelector('[data-type="id"]');
+                                btnId.click(); // 触发点击动画
+                                state.searchType = 'id';
+                                state.isPrefixEnabled = true; // 强制开启前缀（既然没开关了，默认开启）
                                 updatePrefixUI();
                                 searchVal = keyword.substring(CONFIG.DEFAULT_PREFIX.length);
                             } else {
-                                document.querySelector('[data-type="name"]').click();
+                                // 🌟 如果不是 XC 开头，严格切换到关键词搜索模式
+                                const btnName = document.querySelector('[data-type="name"]');
+                                btnName.click(); // 触发 UI 切换
+                                state.searchType = 'name'; // 强制更新内部状态
+                                updatePrefixUI(); // 隐藏前缀 UI
                             }
                             
                             els.searchInput.value = searchVal;
