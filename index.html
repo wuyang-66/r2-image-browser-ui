@@ -19,6 +19,14 @@
         }
         @keyframes modal-in { from { opacity: 0; transform: scale(0.95) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes heartBeat {
+            0% { transform: scale(1); }
+            14% { transform: scale(1.3); }
+            28% { transform: scale(1); }
+            42% { transform: scale(1.3); }
+            70% { transform: scale(1); }
+        }
+        .heart-beat { animation: heartBeat 0.5s ease-in-out; }
         .modal-enter { animation: modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .no-scroll { overflow: hidden; }
 
@@ -30,9 +38,6 @@
             width: 100%;
             height: 100%;
         }
-        
-        .toggle-checkbox:checked { right: 0; border-color: var(--brand-color-from); }
-        .toggle-checkbox:checked + .toggle-label { background-color: var(--brand-color-from); }
 
         input[type="search"]::-webkit-search-decoration,
         input[type="search"]::-webkit-search-cancel-button,
@@ -64,12 +69,37 @@
         #suggestions-box::-webkit-scrollbar { width: 6px; }
         #suggestions-box::-webkit-scrollbar-track { background: #f1f5f9; }
         #suggestions-box::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        /* 收藏按钮样式 */
+        .fav-btn {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            padding: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        .fav-btn:hover { background: #fff; transform: scale(1.1); }
+        .fav-btn.active i { fill: #ef4444; color: #ef4444; }
     </style>
 </head>
 <body class="antialiased text-slate-800">
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-        <header class="text-center mb-8 md:mb-12 pt-8">
+    <!-- 顶部工具栏 -->
+    <div class="fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-md border-b border-slate-200 z-40 flex items-center justify-between px-4 sm:px-6">
+        <div class="font-bold text-slate-700 truncate" id="top-bar-username">未绑定身份</div>
+        <button id="nav-fav-btn" class="flex items-center space-x-2 text-slate-600 hover:text-red-500 transition-colors bg-slate-100 hover:bg-red-50 px-3 py-1.5 rounded-full font-medium text-sm">
+            <i data-lucide="heart" class="w-4 h-4"></i>
+            <span>我的收藏</span>
+            <span id="fav-count-badge" class="bg-slate-200 text-slate-600 rounded-full px-2 py-0.5 text-xs">0</span>
+        </button>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 mt-10">
+        <header class="text-center mb-8 md:mb-12 pt-4">
             <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)]">
                 迅驰工具在线查询
             </h1>
@@ -125,11 +155,13 @@
         <div id="results-count-container" class="max-w-3xl mx-auto mt-6 hidden"></div>
         
         <div id="recent-title" class="max-w-7xl mx-auto mt-10 mb-2 hidden flex items-center justify-between">
-            <div class="flex items-center text-xl font-bold text-slate-700">
-                <i data-lucide="sparkles" class="w-6 h-6 text-amber-500 mr-2"></i>
-                近期更新
+            <div class="flex items-center text-xl font-bold text-slate-700" id="main-section-title">
+                <i data-lucide="sparkles" class="w-6 h-6 text-amber-500 mr-2" id="main-section-icon"></i>
+                <span id="main-section-text">近期更新</span>
             </div>
-            <span class="text-sm text-slate-400 bg-slate-100 px-3 py-1 rounded-full">New</span>
+            <button id="sync-cloud-btn" class="hidden text-sm text-white bg-blue-500 hover:bg-blue-600 px-4 py-1.5 rounded-full shadow-sm flex items-center transition-colors">
+                <i data-lucide="cloud-upload" class="w-4 h-4 mr-1"></i>一键同步到云端
+            </button>
         </div>
 
         <main id="gallery" class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></main>
@@ -144,6 +176,53 @@
         <div id="gallery-message" class="mt-12"></div>
     </div>
     
+    <!-- 同步配置弹窗 -->
+    <div id="sync-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div class="absolute inset-0 bg-black/50" onclick="document.getElementById('sync-modal').classList.add('hidden')"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 modal-enter">
+            <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center">
+                <i data-lucide="cloud" class="w-6 h-6 text-blue-500 mr-2"></i> 云同步设置
+            </h3>
+            
+            <div id="sync-unbound-view">
+                <p class="text-sm text-slate-500 mb-4">绑定身份后可生成唯一的6位同步码，跨设备恢复收藏数据。如果不慎遗忘，可联系管理员通过姓名找回。</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">我是新用户</label>
+                        <div class="flex space-x-2">
+                            <input type="text" id="sync-new-name" placeholder="请输入您的姓名 (如: 张三)" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                            <button id="btn-generate-code" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">生成同步码</button>
+                        </div>
+                    </div>
+                    <div class="relative py-2"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-300"></div></div><div class="relative flex justify-center"><span class="bg-white px-2 text-sm text-gray-500">或</span></div></div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">我已有同步码 (恢复数据)</label>
+                        <div class="flex space-x-2">
+                            <input type="text" id="sync-exist-code" placeholder="输入6位同步码" maxlength="6" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none font-mono tracking-widest text-center">
+                            <button id="btn-restore-data" class="bg-teal-500 text-white px-4 py-2 rounded-lg hover:bg-teal-600 transition-colors">恢复数据</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sync-bound-view" class="hidden text-center py-4">
+                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="user-check" class="w-8 h-8 text-blue-600"></i>
+                </div>
+                <h4 class="text-lg font-bold text-slate-800" id="bound-name-display">姓名</h4>
+                <div class="mt-2 bg-slate-100 rounded-lg p-3 inline-block">
+                    <p class="text-xs text-slate-500 mb-1">您的专属同步码</p>
+                    <p class="text-2xl font-mono font-bold tracking-widest text-slate-700" id="bound-code-display">888888</p>
+                </div>
+                <p class="text-sm text-red-500 mt-4 cursor-pointer hover:underline" id="btn-unbind">断开绑定并清除本地信息</p>
+            </div>
+            
+            <button onclick="document.getElementById('sync-modal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </div>
+
     <!-- 详情弹窗 -->
     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
         <div id="modal-overlay" class="absolute inset-0 bg-black/70 fade-in-bg"></div>
@@ -191,6 +270,40 @@
             MAX_CACHE_SIZE: 30 
         };
 
+        // 🌟 收藏夹与身份状态管理
+        const FavManager = {
+            items: JSON.parse(localStorage.getItem('xc_favorites') || '[]'),
+            userInfo: JSON.parse(localStorage.getItem('xc_user_info') || 'null'),
+            
+            save() { localStorage.setItem('xc_favorites', JSON.stringify(this.items)); this.updateUI(); },
+            saveUser(info) { this.userInfo = info; localStorage.setItem('xc_user_info', JSON.stringify(info)); this.updateUI(); },
+            
+            toggle(imgObj) {
+                const index = this.items.findIndex(item => item.key === imgObj.key);
+                let isAdded = false;
+                if (index > -1) {
+                    this.items.splice(index, 1);
+                } else {
+                    this.items.unshift(imgObj); // 存入完整对象以便离线查看
+                    isAdded = true;
+                }
+                this.save();
+                return isAdded;
+            },
+            
+            isFav(key) { return this.items.some(item => item.key === key); },
+            
+            updateUI() {
+                document.getElementById('fav-count-badge').textContent = this.items.length;
+                if (this.userInfo && this.userInfo.name) {
+                    document.getElementById('top-bar-username').innerHTML = `<i data-lucide="user" class="inline w-4 h-4 mr-1 mb-1"></i>${this.userInfo.name} (已绑定)`;
+                } else {
+                    document.getElementById('top-bar-username').textContent = '未绑定身份';
+                }
+                lucide.createIcons();
+            }
+        };
+
         const Cache = {
             store: new Map(),
             getKey: (type, query) => `${type}_${query.toLowerCase()}`,
@@ -225,7 +338,7 @@
             nextOffset: 0,
             hasMore: false,
             loadedCount: 0,
-            isShowingRecent: false,
+            currentView: 'recent', // 'recent', 'search', 'favorites'
             cachedRecentUpdates: null 
         };
         
@@ -253,7 +366,8 @@
             modal: document.getElementById('modal'),
             modalImg: document.getElementById('modal-image'),
             viewer: document.getElementById('image-viewer'),
-            viewerImg: document.getElementById('viewer-image')
+            viewerImg: document.getElementById('viewer-image'),
+            syncModal: document.getElementById('sync-modal')
         };
 
         const escapeHTML = (str) => {
@@ -267,7 +381,7 @@
             els.gallery.innerHTML = '';
             els.resultsCount.classList.add('hidden');
             els.loadMoreContainer.classList.add('hidden');
-            let icon = type === 'loading' ? 'loader-2' : (type === 'error' ? 'alert-triangle' : 'search');
+            let icon = type === 'loading' ? 'loader-2' : (type === 'error' ? 'alert-triangle' : (type === 'heart' ? 'heart' : 'search'));
             let color = type === 'loading' ? 'text-blue-500' : (type === 'error' ? 'text-red-500' : 'text-slate-400');
             els.galleryMsg.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[30vh] text-slate-500">
                 <i data-lucide="${icon}" class="w-12 h-12 ${type === 'loading' ? 'animate-spin' : ''} ${color}"></i>
@@ -335,31 +449,39 @@
             
             const fragment = document.createDocumentFragment();
             images.forEach((img) => {
-                const originalUrl = `${CONFIG.R2_BUCKET_URL}/${img.key}`;
+                const versionQuery = img.uploaded ? `?v=${img.uploaded}` : '';
+                const originalUrl = `${CONFIG.R2_BUCKET_URL}/${img.key}${versionQuery}`;
                 const thumb = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=400,height=400,fit=cover,format=auto,quality=75/${originalUrl}`;
                 
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400';
+                card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 relative';
                 card.style.animation = `popIn 0.5s ease-out forwards`;
                 card.tabIndex = 0;
                 
                 card.dataset.original = originalUrl;
+                card.dataset.key = img.key; // For favorites
                 card.dataset.displayName = escapeHTML(img.displayName);
                 card.dataset.productName = escapeHTML(img.productName);
                 card.dataset.description = escapeHTML(img.description || '正在完善中....');
+                card.dataset.uploaded = img.uploaded || ''; // Store for favoriting
 
-                const newBadge = state.isShowingRecent 
-                    ? `<div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10">NEW</div>`
+                const isFav = FavManager.isFav(img.key);
+                
+                const newBadge = state.currentView === 'recent'
+                    ? `<div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 pointer-events-none">NEW</div>`
                     : '';
 
                 card.innerHTML = `
+                    <button class="fav-btn ${isFav ? 'active' : ''}" title="加入/取消收藏">
+                        <i data-lucide="heart" class="w-5 h-5 text-slate-400"></i>
+                    </button>
                     <div class="relative aspect-square bg-slate-100 overflow-hidden">
                         ${newBadge}
                         <div class="absolute inset-0 image-placeholder animate-pulse"><i data-lucide="image" class="w-8 h-8 text-slate-300"></i></div>
-                        <img src="${thumb}" loading="lazy" decoding="async" class="w-full h-full object-cover opacity-0 transition-opacity duration-500">
-                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><p class="text-white font-bold text-lg">查看详情</p></div>
+                        <img src="${thumb}" loading="lazy" decoding="async" class="w-full h-full object-cover opacity-0 transition-opacity duration-500 pointer-events-none">
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none"><p class="text-white font-bold text-lg">查看详情</p></div>
                     </div>
-                    <div class="p-3 bg-slate-50"><p class="text-sm font-semibold text-slate-600 text-center truncate">${card.dataset.productName}</p><p class="text-xs text-slate-400 text-center mt-1">${card.dataset.displayName}</p></div>
+                    <div class="p-3 bg-slate-50"><p class="text-sm font-semibold text-slate-600 text-center truncate pointer-events-none">${card.dataset.productName}</p><p class="text-xs text-slate-400 text-center mt-1 pointer-events-none">${card.dataset.displayName}</p></div>
                 `;
                 const imgEl = card.querySelector('img');
                 imgEl.onload = () => { imgEl.style.opacity = '1'; card.querySelector('.image-placeholder').style.display = 'none'; };
@@ -405,13 +527,19 @@
 
         async function loadRecentUpdates() {
             state.isLoading = true;
-            state.isShowingRecent = true;
-            els.recentTitle.classList.remove('hidden'); 
+            state.currentView = 'recent';
+            els.recentTitle.classList.remove('hidden');
+            document.getElementById('main-section-icon').setAttribute('data-lucide', 'sparkles');
+            document.getElementById('main-section-icon').className = 'w-6 h-6 text-amber-500 mr-2';
+            document.getElementById('main-section-text').textContent = '近期更新';
+            document.getElementById('sync-cloud-btn').classList.add('hidden');
+            
             els.resultsCount.classList.add('hidden'); 
             
             if (state.cachedRecentUpdates) {
                 renderCards(state.cachedRecentUpdates, false);
                 state.isLoading = false;
+                lucide.createIcons({ root: els.recentTitle });
                 return;
             }
 
@@ -438,10 +566,37 @@
                 if (!searchAbortController.signal.aborted) {
                     state.isLoading = false;
                 }
+                lucide.createIcons({ root: els.recentTitle });
             }
         }
 
-        // 🌟 新增：加载热搜数据
+        // 🌟 展示收藏列表
+        function loadFavoritesView() {
+            state.currentView = 'favorites';
+            els.searchInput.value = '';
+            updateClearBtnVisibility();
+            els.resultsCount.classList.add('hidden');
+            els.loadMoreContainer.classList.add('hidden');
+            els.recentTitle.classList.remove('hidden');
+            
+            document.getElementById('main-section-icon').setAttribute('data-lucide', 'heart');
+            document.getElementById('main-section-icon').className = 'w-6 h-6 text-red-500 mr-2';
+            document.getElementById('main-section-text').textContent = '我的收藏';
+            
+            if (FavManager.userInfo) {
+                document.getElementById('sync-cloud-btn').classList.remove('hidden');
+            } else {
+                document.getElementById('sync-cloud-btn').classList.add('hidden');
+            }
+            lucide.createIcons({ root: els.recentTitle });
+
+            if (FavManager.items.length === 0) {
+                showMessage('heart', '您还没有收藏任何产品。在搜索结果中点击红心即可加入。');
+            } else {
+                renderCards(FavManager.items, false);
+            }
+        }
+
         async function loadHotSearches() {
             try {
                 const resp = await fetch(`${CONFIG.API_WORKER_URL}/hot-searches`);
@@ -452,22 +607,17 @@
                     
                     data.hotSearches.forEach(keyword => {
                         const btn = document.createElement('button');
-                        // 使用橙色主题让热搜标签更显眼
                         btn.className = 'px-3 py-1 text-xs font-medium bg-orange-50 text-orange-600 border border-orange-200 rounded-full hover:bg-orange-100 transition-colors shadow-sm cursor-pointer';
                         btn.textContent = keyword;
                         
-                        // 点击热搜词自动执行搜索
                         btn.onclick = () => {
                             let searchVal = keyword;
-                            
-                            // 智能判断：如果关键词以 XC 开头，自动切换到编号搜索模式
                             if (keyword.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX.toUpperCase())) {
                                 document.querySelector('[data-type="id"]').click();
                                 state.isPrefixEnabled = true;
                                 updatePrefixUI();
-                                searchVal = keyword.substring(CONFIG.DEFAULT_PREFIX.length); // 去掉 XC 填入输入框，前端会自动补上
+                                searchVal = keyword.substring(CONFIG.DEFAULT_PREFIX.length);
                             } else {
-                                // 否则切换到关键词搜索模式
                                 document.querySelector('[data-type="name"]').click();
                             }
                             
@@ -500,19 +650,17 @@
             if (!isLoadMore) {
                 const cachedData = Cache.get(state.searchType, effectiveQuery);
                 if (cachedData) {
-                    state.isShowingRecent = false;
+                    state.currentView = 'search';
                     els.recentTitle.classList.add('hidden');
-                    
                     state.nextCursor = null;
                     state.nextOffset = 0;
-                    
                     handleSearchResults(cachedData, false);
                     return; 
                 }
             }
 
             state.isLoading = true;
-            state.isShowingRecent = false;
+            state.currentView = 'search';
             els.recentTitle.classList.add('hidden');
 
             if (searchAbortController) searchAbortController.abort();
@@ -529,7 +677,10 @@
             }
 
             try {
-                let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(effectiveQuery)}&type=${state.searchType}&limit=${CONFIG.PAGE_LIMIT}`;
+                // 🌟 将用户的名称带入搜索请求中，实名记录日志
+                const userParam = FavManager.userInfo ? `&user=${encodeURIComponent(FavManager.userInfo.name)}` : '';
+                let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(effectiveQuery)}&type=${state.searchType}&limit=${CONFIG.PAGE_LIMIT}${userParam}`;
+                
                 if (state.searchType === 'name') url += `&offset=${state.nextOffset}`;
                 else if (state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
 
@@ -596,9 +747,10 @@
             } catch (e) {}
         }
 
+        // --- 事件监听 ---
+        
         els.searchInput.addEventListener('input', () => {
             let rawVal = els.searchInput.value;
-            
             if (state.searchType === 'id' && state.isPrefixEnabled) {
                 let trimmed = rawVal.trimStart();
                 let upperPrefix = CONFIG.DEFAULT_PREFIX.toUpperCase();
@@ -611,10 +763,8 @@
                     els.visualPrefix.textContent = CONFIG.DEFAULT_PREFIX;
                 }
             }
-            
             checkValidation();
             updateClearBtnVisibility();
-            
             clearTimeout(state.debounceTimer);
             state.debounceTimer = setTimeout(() => {
                 const val = state.searchType === 'id' ? els.searchInput.value.replace(/\s+/g, '') : els.searchInput.value.trim();
@@ -622,10 +772,7 @@
             }, 300);
         });
 
-        els.searchInput.addEventListener('keyup', (e) => { 
-            if (e.key === 'Enter') performSearch(false); 
-        });
-        
+        els.searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') performSearch(false); });
         els.searchBtn.addEventListener('click', () => performSearch(false));
         els.loadMoreBtn.addEventListener('click', () => performSearch(true));
 
@@ -634,12 +781,9 @@
             els.visualPrefix.textContent = CONFIG.DEFAULT_PREFIX;
             checkValidation();
             updateClearBtnVisibility();
-            
             if (searchAbortController) searchAbortController.abort();
             state.isLoading = false;
-            
             els.suggestionsBox.classList.add('hidden');
-            
             loadRecentUpdates();
             els.searchInput.focus();
         });
@@ -648,18 +792,14 @@
             const btn = e.target.closest('button');
             if (!btn) return;
             state.searchType = btn.dataset.type;
-            
             document.querySelectorAll('.search-type-btn').forEach(b => b.classList.toggle('active', b === btn));
             els.searchInput.placeholder = state.searchType === 'id' ? '输入编号进行搜索...' : '输入关键词进行搜索...';
-            
             updatePrefixUI();
             els.searchInput.value = '';
             els.visualPrefix.textContent = CONFIG.DEFAULT_PREFIX;
             checkValidation();
             updateClearBtnVisibility();
-            
             els.suggestionsBox.classList.add('hidden');
-            
             if (searchAbortController) searchAbortController.abort();
             loadRecentUpdates();
         });
@@ -670,8 +810,36 @@
             }
         });
 
+        // 🌟 收藏操作与图片详情查看
         els.gallery.addEventListener('click', (e) => {
+            const favBtn = e.target.closest('.fav-btn');
             const card = e.target.closest('.group');
+            
+            if (favBtn && card) {
+                e.stopPropagation(); // 阻止打开图片弹窗
+                const imgData = {
+                    key: card.dataset.key,
+                    displayName: card.dataset.displayName,
+                    productName: card.dataset.productName,
+                    description: card.dataset.description,
+                    uploaded: card.dataset.uploaded
+                };
+                
+                const isAdded = FavManager.toggle(imgData);
+                favBtn.classList.toggle('active', isAdded);
+                
+                if (isAdded) {
+                    favBtn.querySelector('i').classList.add('heart-beat');
+                    setTimeout(() => favBtn.querySelector('i').classList.remove('heart-beat'), 500);
+                }
+                
+                // 如果当前正在“我的收藏”视图，并且取消了收藏，则刷新界面
+                if (state.currentView === 'favorites' && !isAdded) {
+                    loadFavoritesView();
+                }
+                return;
+            }
+
             if (!card) return;
             
             const originalUrl = card.dataset.original;
@@ -710,18 +878,125 @@
         els.viewer.addEventListener('click', (e) => { if (e.target !== els.viewerImg) closeViewer(); });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeViewer();
-                closeModal();
+            if (e.key === 'Escape') { closeViewer(); closeModal(); }
+        });
+
+        // 🌟 云同步相关逻辑
+        document.getElementById('top-bar-username').addEventListener('click', () => openSyncModal());
+        document.getElementById('nav-fav-btn').addEventListener('click', () => {
+            if (state.currentView === 'favorites') openSyncModal(); // 如果已经在收藏页，再次点击打开设置
+            else loadFavoritesView();
+        });
+
+        function openSyncModal() {
+            if (FavManager.userInfo) {
+                document.getElementById('sync-unbound-view').classList.add('hidden');
+                document.getElementById('sync-bound-view').classList.remove('hidden');
+                document.getElementById('bound-name-display').textContent = FavManager.userInfo.name;
+                document.getElementById('bound-code-display').textContent = FavManager.userInfo.code;
+            } else {
+                document.getElementById('sync-unbound-view').classList.remove('hidden');
+                document.getElementById('sync-bound-view').classList.add('hidden');
+            }
+            els.syncModal.classList.remove('hidden');
+        }
+
+        document.getElementById('btn-generate-code').addEventListener('click', async () => {
+            const nameInput = document.getElementById('sync-new-name');
+            const username = nameInput.value.trim();
+            if (!username) return alert('请输入姓名');
+            
+            const btn = document.getElementById('btn-generate-code');
+            btn.disabled = true; btn.textContent = '生成中...';
+            
+            try {
+                const res = await fetch(`${CONFIG.API_WORKER_URL}/api/sync/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    FavManager.saveUser({ name: data.username, code: data.syncCode });
+                    // 如果本地有数据，顺便推送一次
+                    if (FavManager.items.length > 0) syncToCloud();
+                    openSyncModal();
+                } else { alert(data.error); }
+            } catch (e) { alert('网络错误，请重试'); } finally {
+                btn.disabled = false; btn.textContent = '生成同步码';
             }
         });
 
+        document.getElementById('btn-restore-data').addEventListener('click', async () => {
+            const codeInput = document.getElementById('sync-exist-code');
+            const syncCode = codeInput.value.trim();
+            if (syncCode.length !== 6) return alert('请输入完整的6位同步码');
+            
+            const btn = document.getElementById('btn-restore-data');
+            btn.disabled = true; btn.textContent = '拉取中...';
+            
+            try {
+                const res = await fetch(`${CONFIG.API_WORKER_URL}/api/sync/pull?code=${syncCode}`);
+                const data = await res.json();
+                if (data.success) {
+                    FavManager.saveUser({ name: data.username, code: syncCode });
+                    FavManager.items = data.data || [];
+                    FavManager.save();
+                    alert(`欢迎回来，${data.username}！已恢复 ${FavManager.items.length} 条收藏数据。`);
+                    els.syncModal.classList.add('hidden');
+                    loadFavoritesView();
+                } else { alert(data.error); }
+            } catch (e) { alert('网络错误或同步码无效'); } finally {
+                btn.disabled = false; btn.textContent = '恢复数据';
+            }
+        });
+
+        document.getElementById('btn-unbind').addEventListener('click', () => {
+            if (confirm('确认断开绑定吗？断开后将清除本设备的收藏数据。')) {
+                FavManager.items = [];
+                FavManager.saveUser(null);
+                FavManager.save();
+                els.syncModal.classList.add('hidden');
+                if (state.currentView === 'favorites') loadRecentUpdates();
+            }
+        });
+
+        async function syncToCloud() {
+            if (!FavManager.userInfo) return;
+            const btn = document.getElementById('sync-cloud-btn');
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 mr-1 animate-spin"></i>同步中...`;
+            try {
+                const res = await fetch(`${CONFIG.API_WORKER_URL}/api/sync/push`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ syncCode: FavManager.userInfo.code, data: FavManager.items })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    btn.innerHTML = `<i data-lucide="check" class="w-4 h-4 mr-1"></i>同步成功`;
+                } else {
+                    btn.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 mr-1"></i>同步失败`;
+                    alert(data.error);
+                }
+            } catch (e) {
+                btn.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 mr-1"></i>网络错误`;
+            }
+            lucide.createIcons({ root: btn });
+            setTimeout(() => {
+                btn.innerHTML = `<i data-lucide="cloud-upload" class="w-4 h-4 mr-1"></i>一键同步到云端`;
+                lucide.createIcons({ root: btn });
+            }, 3000);
+        }
+
+        document.getElementById('sync-cloud-btn').addEventListener('click', syncToCloud);
+
         // --- 初始化 ---
+        FavManager.updateUI(); // 初始化身份和角标
         lucide.createIcons();
         updatePrefixUI();
         
         loadRecentUpdates();
-        loadHotSearches(); // 🌟 初始化时加载热门搜索
+        loadHotSearches(); 
         
     });
     </script>
