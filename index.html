@@ -119,6 +119,16 @@
                 <span>搜索</span>
             </button>
         </div>
+
+        <!-- 🌟 新增的热搜区域 -->
+        <div id="hot-searches-container" class="max-w-3xl mx-auto mt-4 hidden items-center space-x-2 px-2 animate-fade-in">
+            <span class="text-sm text-slate-500 flex items-center whitespace-nowrap shrink-0">
+                <i data-lucide="flame" class="w-4 h-4 text-orange-500 mr-1"></i>热门搜索：
+            </span>
+            <div id="hot-searches-list" class="flex flex-wrap gap-2 items-center">
+                <!-- 热搜关键词会动态插入到这里 -->
+            </div>
+        </div>
         
         <div id="results-count-container" class="max-w-3xl mx-auto mt-6 hidden"></div>
         
@@ -150,7 +160,6 @@
                 <div id="modal-img-loader" class="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
                     <i data-lucide="loader-2" class="w-10 h-10 text-blue-500 animate-spin"></i>
                 </div>
-                <!-- 🌟 已恢复：弹窗右上角关闭按钮，提高了层级 z-30 并添加白色背景防遮挡 -->
                 <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-30 bg-white/80 shadow-sm rounded-full p-1">
                     <i data-lucide="x" class="w-7 h-7"></i>
                 </button>
@@ -249,6 +258,8 @@
             validationMsg: document.getElementById('search-validation-msg'),
             prefixToggle: document.getElementById('prefix-toggle'),
             prefixContainer: document.getElementById('prefix-toggle-container'),
+            hotSearchesContainer: document.getElementById('hot-searches-container'),
+            hotSearchesList: document.getElementById('hot-searches-list'),
             modal: document.getElementById('modal'),
             modalImg: document.getElementById('modal-image'),
             viewer: document.getElementById('image-viewer'),
@@ -275,7 +286,6 @@
             lucide.createIcons({ root: els.galleryMsg });
         }
 
-        // 🌟 已恢复：自动清理所有空格的逻辑，解决复制/误输入空格搜不到的问题
         function getEffectiveQuery() {
             let rawVal = els.searchInput.value;
             let val = state.searchType === 'id' ? rawVal.replace(/\s+/g, '') : rawVal.trim();
@@ -283,7 +293,6 @@
             if (state.searchType === 'id' && state.isPrefixEnabled) {
                 if (val.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX.toUpperCase())) {
                     val = val.substring(CONFIG.DEFAULT_PREFIX.length);
-                    // 同步到输入框，去除多余前缀和空格
                     if (els.searchInput.value !== val) els.searchInput.value = val;
                 }
                 return val ? CONFIG.DEFAULT_PREFIX + val : '';
@@ -292,7 +301,6 @@
         }
 
         function checkValidation() {
-            // 🌟 校验时也要忽略空格
             const val = state.searchType === 'id' ? els.searchInput.value.replace(/\s+/g, '') : els.searchInput.value.trim();
             let isValid = true;
             let msg = "";
@@ -440,6 +448,54 @@
                 if (!searchAbortController.signal.aborted) {
                     state.isLoading = false;
                 }
+            }
+        }
+
+        // 🌟 新增：加载热搜数据
+        async function loadHotSearches() {
+            try {
+                const resp = await fetch(`${CONFIG.API_WORKER_URL}/hot-searches`);
+                const data = await resp.json();
+                
+                if (data.success && data.hotSearches && data.hotSearches.length > 0) {
+                    els.hotSearchesList.innerHTML = '';
+                    
+                    data.hotSearches.forEach(keyword => {
+                        const btn = document.createElement('button');
+                        // 使用橙色主题让热搜标签更显眼
+                        btn.className = 'px-3 py-1 text-xs font-medium bg-orange-50 text-orange-600 border border-orange-200 rounded-full hover:bg-orange-100 transition-colors shadow-sm cursor-pointer';
+                        btn.textContent = keyword;
+                        
+                        // 点击热搜词自动执行搜索
+                        btn.onclick = () => {
+                            let searchVal = keyword;
+                            
+                            // 智能判断：如果关键词以 XC 开头，自动切换到编号搜索模式
+                            if (keyword.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX.toUpperCase())) {
+                                document.querySelector('[data-type="id"]').click();
+                                els.prefixToggle.checked = true;
+                                state.isPrefixEnabled = true;
+                                updatePrefixUI();
+                                searchVal = keyword.substring(CONFIG.DEFAULT_PREFIX.length); // 去掉 XC 填入输入框，前端会自动补上
+                            } else {
+                                // 否则切换到关键词搜索模式
+                                document.querySelector('[data-type="name"]').click();
+                            }
+                            
+                            els.searchInput.value = searchVal;
+                            checkValidation();
+                            updateClearBtnVisibility();
+                            performSearch(false);
+                        };
+                        els.hotSearchesList.appendChild(btn);
+                    });
+                    
+                    els.hotSearchesContainer.classList.remove('hidden');
+                    els.hotSearchesContainer.classList.add('flex');
+                    lucide.createIcons({ root: els.hotSearchesContainer });
+                }
+            } catch (e) {
+                console.error('获取热门搜索失败', e);
             }
         }
 
@@ -685,6 +741,7 @@
         updatePrefixUI();
         
         loadRecentUpdates();
+        loadHotSearches(); // 🌟 初始化时加载热门搜索
         
     });
     </script>
