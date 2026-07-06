@@ -19,68 +19,33 @@
         }
         @keyframes modal-in { from { opacity: 0; transform: scale(0.95) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        @keyframes heartBeat {
-            0% { transform: scale(1); }
-            14% { transform: scale(1.3); }
-            28% { transform: scale(1); }
-            42% { transform: scale(1.3); }
-            70% { transform: scale(1); }
-        }
+        @keyframes heartBeat { 0% { transform: scale(1); } 14% { transform: scale(1.3); } 28% { transform: scale(1); } 42% { transform: scale(1.3); } 70% { transform: scale(1); } }
         .heart-beat { animation: heartBeat 0.5s ease-in-out; }
         .modal-enter { animation: modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .no-scroll { overflow: hidden; }
 
-        .image-placeholder {
-            background-color: #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-        }
-
         input[type="search"]::-webkit-search-decoration,
         input[type="search"]::-webkit-search-cancel-button,
         input[type="search"]::-webkit-search-results-button,
-        input[type="search"]::-webkit-search-results-decoration {
-            -webkit-appearance: none;
-            display: none !important;
-        }
+        input[type="search"]::-webkit-search-results-decoration { -webkit-appearance: none; display: none !important; }
 
         .search-type-btn {
-            padding: 8px 16px;
-            border-radius: 9999px;
-            border: 1px solid #cbd5e1;
-            cursor: pointer;
-            transition: all 0.2s ease-in-out;
-            font-weight: 500;
-            background-color: white;
-            color: #475569;
+            padding: 8px 16px; border-radius: 9999px; border: 1px solid #cbd5e1;
+            cursor: pointer; transition: all 0.2s ease-in-out; font-weight: 500;
+            background-color: white; color: #475569;
         }
-        .search-type-btn.active {
-            background-color: var(--brand-color-from);
-            color: white;
-            border-color: var(--brand-color-from);
-        }
+        .search-type-btn.active { background-color: var(--brand-color-from); color: white; border-color: var(--brand-color-from); }
         
         #modal-image { cursor: zoom-in; }
-
         #suggestions-box { max-height: 320px; overflow-y: auto; }
         #suggestions-box::-webkit-scrollbar { width: 6px; }
         #suggestions-box::-webkit-scrollbar-track { background: #f1f5f9; }
         #suggestions-box::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
-        /* 收藏按钮样式优化：针对 SVG 设置变红 */
         .fav-btn {
-            position: absolute;
-            top: 8px;
-            left: 8px;
-            z-index: 20;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 50%;
-            padding: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: all 0.2s;
+            position: absolute; top: 8px; left: 8px; z-index: 20;
+            background: rgba(255, 255, 255, 0.9); border-radius: 50%; padding: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;
         }
         .fav-btn:hover { background: #fff; transform: scale(1.1); }
         .fav-btn.active svg { fill: #ef4444; color: #ef4444; }
@@ -88,26 +53,15 @@
 </head>
 <body class="antialiased text-slate-800">
 
-    <!-- 顶部工具栏 -->
     <div class="fixed top-0 left-0 right-0 h-14 bg-white/80 backdrop-blur-md border-b border-slate-200 z-40 flex items-center justify-between px-4 sm:px-6">
         <div class="flex items-center space-x-2">
             <button id="nav-home-btn" class="flex items-center space-x-1 text-slate-600 hover:text-blue-500 transition-colors bg-slate-100 hover:bg-blue-50 px-3 py-1.5 rounded-full font-medium text-sm">
-                <i data-lucide="home" class="w-4 h-4"></i>
-                <span class="hidden sm:inline">首页</span>
+                <i data-lucide="home" class="w-4 h-4"></i><span class="hidden sm:inline">首页</span>
             </button>
             <button id="nav-fav-btn" class="flex items-center space-x-2 text-slate-600 hover:text-red-500 transition-colors bg-slate-100 hover:bg-red-50 px-3 py-1.5 rounded-full font-medium text-sm">
-                <i data-lucide="heart" class="w-4 h-4"></i>
-                <span>我的收藏</span>
+                <i data-lucide="heart" class="w-4 h-4"></i><span>我的收藏</span>
                 <span id="fav-count-badge" class="bg-slate-200 text-slate-600 rounded-full px-2 py-0.5 text-xs">0</span>
             </button>
-        </div>
-        
-        <div class="font-bold text-slate-600 truncate cursor-pointer hover:text-blue-500 transition-colors flex items-center bg-slate-50 px-3 py-1.5 rounded-full text-sm border border-slate-200" id="top-bar-username-container">
-            <div id="top-bar-username" class="flex items-center">
-                <i data-lucide="user" class="w-4 h-4 mr-1"></i>
-                <span>未绑定身份</span>
-            </div>
-            <i data-lucide="edit-3" class="w-3 h-3 ml-2 text-slate-400"></i>
         </div>
     </div>
 
@@ -116,7 +70,7 @@
             <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)] cursor-pointer" id="main-title-logo">
                 迅驰工具在线查询
             </h1>
-            <p class="mt-3 text-lg text-slate-500">随时随地查询，实时同步更新</p>
+            <p class="mt-3 text-lg text-slate-500">随时随地查询您的产品信息</p>
         </header>
 
         <div id="search-type-switcher" class="flex justify-center mb-6 space-x-2">
@@ -130,26 +84,19 @@
 
         <div class="max-w-3xl mx-auto flex items-center space-x-2">
             <div class="relative flex-grow" id="search-container">
-                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <i data-lucide="search" class="w-5 h-5 text-slate-400"></i>
-                </div>
-                <div id="visual-prefix" class="absolute inset-y-0 left-10 flex items-center font-bold text-slate-400 pointer-events-none transition-opacity duration-200">
-                    XC
-                </div>
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><i data-lucide="search" class="w-5 h-5 text-slate-400"></i></div>
+                <div id="visual-prefix" class="absolute inset-y-0 left-10 flex items-center font-bold text-slate-400 pointer-events-none transition-opacity duration-200">XC</div>
                 <input type="search" id="search-input" placeholder="输入编号进行搜索..."
                        class="w-full pl-16 pr-10 py-3 text-base border-2 border-slate-200 rounded-full shadow-sm 
                               focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none
-                              transition-all duration-300 ease-in-out"
-                       autocomplete="off">
+                              transition-all duration-300 ease-in-out" autocomplete="off">
                 <button id="clear-btn" class="absolute inset-y-0 right-0 pr-4 flex items-center cursor-pointer hidden">
                     <i data-lucide="x-circle" class="w-5 h-5 text-slate-400 hover:text-slate-600"></i>
                 </button>
-                
                 <div id="suggestions-box" class="absolute z-40 w-full mt-2 bg-white rounded-2xl shadow-lg border border-slate-100 hidden">
                     <ul id="suggestions-list"></ul>
                 </div>
             </div>
-            
             <button id="search-btn" class="flex-shrink-0 px-6 py-3 font-semibold text-white bg-gradient-to-r from-[var(--brand-color-from)] to-[var(--brand-color-to)] rounded-full shadow-sm hover:opacity-90 disabled:opacity-50 transition-all">
                 <span>搜索</span>
             </button>
@@ -159,8 +106,7 @@
             <span class="text-sm text-slate-500 flex items-center whitespace-nowrap shrink-0">
                 <i data-lucide="flame" class="w-4 h-4 text-orange-500 mr-1"></i>热门搜索：
             </span>
-            <div id="hot-searches-list" class="flex flex-wrap gap-2 items-center">
-            </div>
+            <div id="hot-searches-list" class="flex flex-wrap gap-2 items-center"></div>
         </div>
         
         <div id="results-count-container" class="max-w-3xl mx-auto mt-6 hidden"></div>
@@ -170,105 +116,43 @@
                 <i data-lucide="sparkles" class="w-6 h-6 text-amber-500 mr-2" id="main-section-icon"></i>
                 <span id="main-section-text">近期更新</span>
             </div>
-            <button id="sync-cloud-btn" class="hidden text-sm text-white bg-blue-500 hover:bg-blue-600 px-4 py-1.5 rounded-full shadow-sm flex items-center transition-colors">
-                <i data-lucide="cloud-upload" class="w-4 h-4 mr-1"></i>一键同步到云端
-            </button>
         </div>
 
         <main id="gallery" class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></main>
 
-        <div id="load-more-container" class="mt-12 mb-12 flex flex-col items-center hidden">
-            <button id="load-more-btn" class="px-8 py-3 bg-white border border-slate-200 text-slate-600 rounded-full font-medium hover:bg-slate-50 transition-colors shadow-sm flex items-center">
-                <span id="load-more-text">加载更多结果</span>
-                <i id="load-more-icon" data-lucide="chevron-down" class="ml-2 w-4 h-4"></i>
-            </button>
+        <!-- 修复后的无限滚动触发容器：不再随意使用 display:none，确保高度存在以供观察器拦截 -->
+        <div id="load-more-container" class="mt-8 mb-12 flex justify-center hidden w-full h-10">
+            <div id="infinite-spinner" class="flex items-center space-x-2 text-slate-400 hidden">
+                <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
+                <span class="text-sm font-medium">加载中...</span>
+            </div>
         </div>
 
         <div id="gallery-message" class="mt-12"></div>
     </div>
-    
-    <!-- 同步配置弹窗 -->
-    <div id="sync-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
-        <div class="absolute inset-0 bg-black/50" onclick="document.getElementById('sync-modal').classList.add('hidden')"></div>
-        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 modal-enter">
-            <h3 class="text-xl font-bold text-slate-800 mb-4 flex items-center">
-                <i data-lucide="cloud" class="w-6 h-6 text-blue-500 mr-2"></i> 绑定姓名开启云收藏功能！
-            </h3>
-            
-            <div id="sync-unbound-view">
-                <p class="text-sm text-slate-500 mb-4">绑定身份后可生成唯一的6位同步码（用于跨设备同步您的收藏夹！）如不慎遗忘，可联系管理员找回。</p>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">我是新用户</label>
-                        <div class="flex space-x-2">
-                            <input type="text" id="sync-new-name" placeholder="请输入您的姓名" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                            <button id="btn-generate-code" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">生成同步码</button>
-                        </div>
-                    </div>
-                    <div class="relative py-2"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-300"></div></div><div class="relative flex justify-center"><span class="bg-white px-2 text-sm text-gray-500">或</span></div></div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">我已有同步码 (恢复数据)</label>
-                        <div class="flex space-x-2">
-                            <input type="text" id="sync-exist-code" placeholder="输入6位同步码" maxlength="6" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none font-mono tracking-widest text-center">
-                            <button id="btn-restore-data" class="bg-teal-500 text-white px-4 py-2 rounded-lg hover:bg-teal-600 transition-colors">恢复数据</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <div id="sync-bound-view" class="hidden text-center py-4">
-                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i data-lucide="user-check" class="w-8 h-8 text-blue-600"></i>
-                </div>
-                <h4 class="text-lg font-bold text-slate-800" id="bound-name-display">姓名</h4>
-                <div class="mt-2 bg-slate-100 rounded-lg p-3 inline-block">
-                    <p class="text-xs text-slate-500 mb-1">您的专属同步码</p>
-                    <p class="text-2xl font-mono font-bold tracking-widest text-slate-700" id="bound-code-display">888888</p>
-                </div>
-                <p class="text-sm text-red-500 mt-4 cursor-pointer hover:underline" id="btn-unbind">断开绑定并清除本地信息</p>
-            </div>
-            
-            <button onclick="document.getElementById('sync-modal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- 详情弹窗 -->
+    <!-- 弹窗部分 -->
     <div id="modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
         <div id="modal-overlay" class="absolute inset-0 bg-black/70 fade-in-bg"></div>
         <div id="modal-content" class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden modal-enter">
             <div class="w-full md:w-3/5 bg-slate-100 flex items-center justify-center p-4 relative min-h-[300px]">
-                <div id="modal-img-loader" class="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
-                    <i data-lucide="loader-2" class="w-10 h-10 text-blue-500 animate-spin"></i>
-                </div>
-                <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-30 bg-white/80 shadow-sm rounded-full p-1">
-                    <i data-lucide="x" class="w-7 h-7"></i>
-                </button>
+                <div id="modal-img-loader" class="absolute inset-0 flex items-center justify-center bg-slate-100 z-10"><i data-lucide="loader-2" class="w-10 h-10 text-blue-500 animate-spin"></i></div>
+                <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-30 bg-white/80 shadow-sm rounded-full p-1"><i data-lucide="x" class="w-7 h-7"></i></button>
                 <img id="modal-image" src="" alt="详情图片" class="max-w-full max-h-[40vh] md:max-h-[80vh] object-contain relative z-20 opacity-0 transition-opacity duration-300">
             </div>
             <div class="w-full md:w-2/5 p-8 overflow-y-auto">
                 <h2 id="modal-title" class="text-3xl font-bold text-slate-800"></h2>
                 <div class="mt-6 space-y-4 text-slate-600">
-                    <div>
-                        <h3 class="font-semibold text-slate-800">产品名称</h3>
-                        <p id="modal-product-name"></p>
-                    </div>
-                    <div>
-                        <h3 class="font-semibold text-slate-800">功能用途</h3>
-                        <p id="modal-description" class="whitespace-pre-wrap"></p>
-                    </div>
+                    <div><h3 class="font-semibold text-slate-800">产品名称</h3><p id="modal-product-name"></p></div>
+                    <div><h3 class="font-semibold text-slate-800">功能用途</h3><p id="modal-description" class="whitespace-pre-wrap"></p></div>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- 查看器 -->
+    
     <div id="image-viewer" class="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 hidden transition-opacity duration-300">
-        <img id="viewer-image" src="" alt="全尺寸图片" class="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"/>
-        <button id="viewer-close-btn" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors">
-            <i data-lucide="x" class="w-10 h-10"></i>
-        </button>
+        <img id="viewer-image" src="" class="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"/>
+        <button id="viewer-close-btn" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"><i data-lucide="x" class="w-10 h-10"></i></button>
     </div>
 
     <script>
@@ -283,60 +167,17 @@
 
         const FavManager = {
             items: JSON.parse(localStorage.getItem('xc_favorites') || '[]'),
-            userInfo: JSON.parse(localStorage.getItem('xc_user_info') || 'null'),
-            
             save() { localStorage.setItem('xc_favorites', JSON.stringify(this.items)); this.updateUI(); },
-            saveUser(info) { this.userInfo = info; localStorage.setItem('xc_user_info', JSON.stringify(info)); this.updateUI(); },
-            
             toggle(imgObj) {
                 const index = this.items.findIndex(item => item.key === imgObj.key);
                 let isAdded = false;
-                if (index > -1) {
-                    this.items.splice(index, 1);
-                } else {
-                    this.items.unshift(imgObj);
-                    isAdded = true;
-                }
+                if (index > -1) this.items.splice(index, 1);
+                else { this.items.unshift(imgObj); isAdded = true; }
                 this.save();
                 return isAdded;
             },
-            
             isFav(key) { return this.items.some(item => item.key === key); },
-            
-            updateUI() {
-                document.getElementById('fav-count-badge').textContent = this.items.length;
-                const usernameEl = document.getElementById('top-bar-username');
-                if (this.userInfo && this.userInfo.name) {
-                    usernameEl.innerHTML = `<i data-lucide="user-check" class="inline w-4 h-4 mr-1 text-blue-500"></i><span class="text-blue-600">${this.userInfo.name}</span>`;
-                } else {
-                    usernameEl.innerHTML = `<i data-lucide="user" class="inline w-4 h-4 mr-1"></i><span>未绑定身份</span>`;
-                }
-                lucide.createIcons();
-            }
-        };
-
-        const Cache = {
-            store: new Map(),
-            getKey: (type, query) => `${type}_${query.toLowerCase()}`,
-            get: (type, query) => {
-                const key = Cache.getKey(type, query);
-                if (Cache.store.has(key)) {
-                    const value = Cache.store.get(key);
-                    Cache.store.delete(key);
-                    Cache.store.set(key, value);
-                    return value;
-                }
-                return null;
-            },
-            set: (type, query, data) => {
-                const key = Cache.getKey(type, query);
-                if (Cache.store.size >= CONFIG.MAX_CACHE_SIZE) {
-                    const firstKey = Cache.store.keys().next().value;
-                    Cache.store.delete(firstKey);
-                }
-                Cache.store.set(key, data);
-            },
-            clear: () => Cache.store.clear()
+            updateUI() { document.getElementById('fav-count-badge').textContent = this.items.length; }
         };
 
         const state = { 
@@ -345,12 +186,10 @@
             searchType: 'id',
             isValid: true,
             isLoading: false,
-            nextCursor: null,
-            nextOffset: 0,
+            nextCursor: null, // 统一使用基于 created_at 的 cursor，抛弃 offset
             hasMore: false,
             loadedCount: 0,
-            currentView: 'recent', 
-            cachedRecentUpdates: null 
+            currentView: 'recent'
         };
         
         let searchAbortController = null;
@@ -367,9 +206,7 @@
             suggestionsBox: document.getElementById('suggestions-box'),
             suggestionsList: document.getElementById('suggestions-list'),
             loadMoreContainer: document.getElementById('load-more-container'),
-            loadMoreBtn: document.getElementById('load-more-btn'),
-            loadMoreText: document.getElementById('load-more-text'),
-            loadMoreIcon: document.getElementById('load-more-icon'),
+            infiniteSpinner: document.getElementById('infinite-spinner'),
             resultsCount: document.getElementById('results-count-container'),
             recentTitle: document.getElementById('recent-title'), 
             validationMsg: document.getElementById('search-validation-msg'),
@@ -378,22 +215,27 @@
             modal: document.getElementById('modal'),
             modalImg: document.getElementById('modal-image'),
             viewer: document.getElementById('image-viewer'),
-            viewerImg: document.getElementById('viewer-image'),
-            syncModal: document.getElementById('sync-modal')
+            viewerImg: document.getElementById('viewer-image')
         };
 
-        // --- 全局点击隐藏联想框 ---
-        document.addEventListener('click', (e) => {
-            if (els.searchContainer && !els.searchContainer.contains(e.target)) {
-                els.suggestionsBox.classList.add('hidden');
+        // 修复：IntersectionObserver 触发器现在拥有固定高度，并在此触发
+        const observerOptions = { root: null, rootMargin: '300px', threshold: 0.1 };
+        const loadMoreObserver = new IntersectionObserver((entries) => {
+            const entry = entries[0];
+            if (entry.isIntersecting && state.hasMore && !state.isLoading) {
+                if (state.currentView === 'recent') loadRecentUpdates(true);
+                else if (state.currentView === 'search') performSearch(true);
             }
+        }, observerOptions);
+        loadMoreObserver.observe(els.loadMoreContainer);
+
+        document.addEventListener('click', (e) => {
+            if (els.searchContainer && !els.searchContainer.contains(e.target)) els.suggestionsBox.classList.add('hidden');
         });
 
         const escapeHTML = (str) => {
             if (!str) return '';
-            return str.replace(/[&<>'"]/g, tag => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-            }[tag]));
+            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag]));
         };
 
         function showMessage(type, message) {
@@ -412,7 +254,6 @@
         function getEffectiveQuery() {
             let rawVal = els.searchInput.value;
             let val = state.searchType === 'id' ? rawVal.replace(/\s+/g, '') : rawVal.trim();
-
             if (state.searchType === 'id' && state.isPrefixEnabled) {
                 if (val.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX.toUpperCase())) {
                     val = val.substring(CONFIG.DEFAULT_PREFIX.length);
@@ -421,34 +262,6 @@
                 return val ? CONFIG.DEFAULT_PREFIX + val : '';
             }
             return val;
-        }
-
-        function checkValidation() {
-            const val = state.searchType === 'id' ? els.searchInput.value.replace(/\s+/g, '') : els.searchInput.value.trim();
-            let isValid = true;
-            let msg = "";
-
-            if (state.searchType === 'id' && val.length > 0) {
-                if (val.length < 2 && !state.isPrefixEnabled) {
-                    isValid = false;
-                    msg = `编号搜索必须输入至少两位字符`;
-                }
-            }
-
-            state.isValid = isValid;
-            if (!isValid) {
-                els.validationMsg.textContent = msg;
-                els.validationMsg.className = "text-sm font-medium transition-all opacity-100 text-red-500 transform translate-y-0";
-                els.searchBtn.disabled = true;
-            } else {
-                els.validationMsg.className = "text-sm font-medium transition-all opacity-0 transform translate-y-1";
-                els.searchBtn.disabled = false;
-            }
-            return isValid;
-        }
-
-        function updateClearBtnVisibility() {
-            els.clearBtn.classList.toggle('hidden', els.searchInput.value === '');
         }
 
         function updatePrefixUI() {
@@ -470,25 +283,23 @@
             images.forEach((img) => {
                 const versionQuery = img.uploaded ? `?v=${img.uploaded}` : '';
                 const originalUrl = `${CONFIG.R2_BUCKET_URL}/${img.key}${versionQuery}`;
+                
+                // 模糊图生成，作为骨架屏底层
+                const blurThumb = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=40,quality=20,blur=10/${originalUrl}`;
                 const thumb = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=400,height=400,fit=cover,format=auto,quality=75/${originalUrl}`;
                 
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 relative';
                 card.style.animation = `popIn 0.5s ease-out forwards`;
-                card.tabIndex = 0;
                 
                 card.dataset.original = originalUrl;
                 card.dataset.key = img.key; 
                 card.dataset.displayName = escapeHTML(img.displayName);
                 card.dataset.productName = escapeHTML(img.productName);
                 card.dataset.description = escapeHTML(img.description || '正在完善中....');
-                card.dataset.uploaded = img.uploaded || ''; 
 
                 const isFav = FavManager.isFav(img.key);
-                
-                const newBadge = state.currentView === 'recent'
-                    ? `<div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 pointer-events-none">NEW</div>`
-                    : '';
+                const newBadge = state.currentView === 'recent' ? `<div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 pointer-events-none">NEW</div>` : '';
 
                 card.innerHTML = `
                     <button class="fav-btn ${isFav ? 'active' : ''}" title="加入/取消收藏">
@@ -496,17 +307,14 @@
                     </button>
                     <div class="relative aspect-square bg-slate-100 overflow-hidden">
                         ${newBadge}
-                        <div class="absolute inset-0 image-placeholder animate-pulse"><i data-lucide="image" class="w-8 h-8 text-slate-300"></i></div>
-                        <img src="${thumb}" loading="lazy" decoding="async" class="w-full h-full object-cover opacity-0 transition-opacity duration-500 pointer-events-none">
+                        <img src="${blurThumb}" class="absolute inset-0 w-full h-full object-cover scale-110 opacity-100 transition-opacity duration-700 pointer-events-none" onerror="this.style.display='none'">
+                        <img src="${thumb}" loading="lazy" decoding="async" 
+                             class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-500 pointer-events-none" 
+                             onload="this.style.opacity='1'; this.previousElementSibling.style.opacity='0';" onerror="this.style.display='none'">
                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none"><p class="text-white font-bold text-lg">查看详情</p></div>
                     </div>
                     <div class="p-3 bg-slate-50"><p class="text-sm font-semibold text-slate-600 text-center truncate pointer-events-none">${card.dataset.productName}</p><p class="text-xs text-slate-400 text-center mt-1 pointer-events-none">${card.dataset.displayName}</p></div>
                 `;
-                const imgEl = card.querySelector('img');
-                imgEl.onload = () => { imgEl.style.opacity = '1'; card.querySelector('.image-placeholder').style.display = 'none'; };
-                
-                card.addEventListener('keydown', (e) => { if (e.key === 'Enter') card.click(); });
-                
                 fragment.appendChild(card);
             });
             els.gallery.appendChild(fragment);
@@ -515,24 +323,24 @@
 
         function handleSearchResults(data, isLoadMore) {
              if (data.success) {
-                if (!isLoadMore) {
-                    state.loadedCount = 0;
-                }
+                if (!isLoadMore) state.loadedCount = 0;
                 
                 state.loadedCount += data.images.length;
                 renderCards(data.images, isLoadMore);
                 
                 state.hasMore = data.hasMore;
                 state.nextCursor = data.nextCursor;
-                state.nextOffset = data.nextOffset;
 
-                els.loadMoreContainer.classList.toggle('hidden', !state.hasMore);
+                // 修复：当含有更多数据时，开放底部占位容器让 Observer 监听；否则将其完全隐藏
+                if (state.hasMore) {
+                    els.loadMoreContainer.classList.remove('hidden');
+                    els.infiniteSpinner.classList.add('hidden'); // 等待 observer 触发时才显示 loading
+                } else {
+                    els.loadMoreContainer.classList.add('hidden');
+                }
                 
                 if (state.loadedCount > 0) {
-                    let countText = state.hasMore 
-                        ? `已加载 ${state.loadedCount} 个结果，可继续下拉加载...` 
-                        : `共为您找到 ${state.loadedCount} 个结果`;
-                        
+                    let countText = state.hasMore ? `已加载 ${state.loadedCount} 个结果，向下滑动加载更多...` : `共为您找到 ${state.loadedCount} 个结果`;
                     els.resultsCount.innerHTML = `<div class="flex items-center text-sm text-slate-500"><i data-lucide="check-circle-2" class="w-4 h-4 mr-2 text-teal-500"></i>${countText}</div>`;
                     els.resultsCount.classList.remove('hidden');
                     lucide.createIcons({ root: els.resultsCount });
@@ -544,80 +352,46 @@
             }
         }
 
-        async function loadRecentUpdates() {
-            state.isLoading = true;
-            state.currentView = 'recent';
-            
-            // 清理搜索状态，回到首页视图
-            els.searchInput.value = '';
-            updateClearBtnVisibility();
-            els.suggestionsBox.classList.add('hidden');
-            
-            els.recentTitle.classList.remove('hidden');
-            document.getElementById('main-section-icon').setAttribute('data-lucide', 'sparkles');
-            document.getElementById('main-section-icon').className = 'w-6 h-6 text-amber-500 mr-2';
-            document.getElementById('main-section-text').textContent = '近期更新';
-            document.getElementById('sync-cloud-btn').classList.add('hidden');
-            
-            els.resultsCount.classList.add('hidden'); 
-            
-            if (state.cachedRecentUpdates) {
-                renderCards(state.cachedRecentUpdates, false);
-                state.isLoading = false;
-                lucide.createIcons({ root: els.recentTitle });
-                return;
+        async function loadRecentUpdates(isLoadMore = false) {
+            if (!isLoadMore) {
+                state.currentView = 'recent';
+                state.nextCursor = null;
+                els.searchInput.value = '';
+                els.clearBtn.classList.add('hidden');
+                els.recentTitle.classList.remove('hidden');
+                els.resultsCount.classList.add('hidden'); 
             }
+
+            if (state.isLoading) return;
+            state.isLoading = true;
 
             if (searchAbortController) searchAbortController.abort();
             searchAbortController = new AbortController();
 
-            showMessage('loading', '正在获取最近收录的产品...');
+            if (!isLoadMore) {
+                showMessage('loading', '正在获取最近收录的产品...');
+            } else {
+                els.infiniteSpinner.classList.remove('hidden'); // 显示底部小菊花
+            }
 
             try {
-                const resp = await fetch(`${CONFIG.API_WORKER_URL}/recent?limit=12`, { signal: searchAbortController.signal });
+                let url = `${CONFIG.API_WORKER_URL}/recent?limit=${CONFIG.PAGE_LIMIT}`;
+                if (isLoadMore && state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
+                
+                const resp = await fetch(url, { signal: searchAbortController.signal });
                 const data = await resp.json();
 
-                if (data.success && data.images && data.images.length > 0) {
-                    state.cachedRecentUpdates = data.images; 
-                    renderCards(data.images, false);
-                } else {
-                    showMessage('info', '暂无最近更新记录，请使用上方搜索框进行查询。');
-                    els.recentTitle.classList.add('hidden');
+                if (data.success) {
+                    if (data.images.length > 0 || isLoadMore) {
+                        handleSearchResults(data, isLoadMore);
+                    } else {
+                        showMessage('info', '暂无记录');
+                    }
                 }
             } catch (e) {
-                if (e.name === 'AbortError') return;
-                showMessage('error', '加载最近更新失败，请重试');
+                if (e.name !== 'AbortError') showMessage('error', '加载失败，请重试');
             } finally {
-                if (!searchAbortController.signal.aborted) {
-                    state.isLoading = false;
-                }
-                lucide.createIcons({ root: els.recentTitle });
-            }
-        }
-
-        function loadFavoritesView() {
-            state.currentView = 'favorites';
-            els.searchInput.value = '';
-            updateClearBtnVisibility();
-            els.resultsCount.classList.add('hidden');
-            els.loadMoreContainer.classList.add('hidden');
-            els.recentTitle.classList.remove('hidden');
-            
-            document.getElementById('main-section-icon').setAttribute('data-lucide', 'heart');
-            document.getElementById('main-section-icon').className = 'w-6 h-6 text-red-500 mr-2';
-            document.getElementById('main-section-text').textContent = '我的收藏';
-            
-            if (FavManager.userInfo) {
-                document.getElementById('sync-cloud-btn').classList.remove('hidden');
-            } else {
-                document.getElementById('sync-cloud-btn').classList.add('hidden');
-            }
-            lucide.createIcons({ root: els.recentTitle });
-
-            if (FavManager.items.length === 0) {
-                showMessage('heart', '您还没有收藏任何产品。在搜索结果中点击红心即可加入。');
-            } else {
-                renderCards(FavManager.items, false);
+                if (!searchAbortController.signal.aborted) state.isLoading = false;
             }
         }
 
@@ -628,63 +402,39 @@
                 
                 if (data.success && data.hotSearches && data.hotSearches.length > 0) {
                     els.hotSearchesList.innerHTML = '';
-                    
                     data.hotSearches.forEach(keyword => {
                         const btn = document.createElement('button');
                         btn.className = 'px-3 py-1 text-xs font-medium bg-orange-50 text-orange-600 border border-orange-200 rounded-full hover:bg-orange-100 transition-colors shadow-sm cursor-pointer';
                         btn.textContent = keyword;
-                        
                         btn.onclick = () => {
                             let searchVal = keyword;
-                            
                             if (keyword.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX.toUpperCase())) {
-                                const btnId = document.querySelector('[data-type="id"]');
-                                btnId.click(); 
+                                document.querySelector('[data-type="id"]').click(); 
                                 searchVal = keyword.substring(CONFIG.DEFAULT_PREFIX.length);
                             } else {
-                                const btnName = document.querySelector('[data-type="name"]');
-                                btnName.click(); 
+                                document.querySelector('[data-type="name"]').click(); 
                             }
-                            
                             els.searchInput.value = searchVal;
-                            checkValidation();
-                            updateClearBtnVisibility();
+                            els.clearBtn.classList.remove('hidden');
                             performSearch(false);
                         };
                         els.hotSearchesList.appendChild(btn);
                     });
-                    
                     els.hotSearchesContainer.classList.remove('hidden');
                     els.hotSearchesContainer.classList.add('flex');
                     lucide.createIcons({ root: els.hotSearchesContainer });
                 }
-            } catch (e) {
-                console.error('获取热门搜索失败', e);
-            }
+            } catch (e) {}
         }
 
         async function performSearch(isLoadMore = false) {
-            // 执行搜索时关闭联想下拉框
             els.suggestionsBox.classList.add('hidden');
             
-            if (!state.isValid || state.isLoading) return;
+            if (state.isLoading) return;
             const effectiveQuery = getEffectiveQuery();
-            
             if (!effectiveQuery || (state.isPrefixEnabled && state.searchType === 'id' && effectiveQuery === CONFIG.DEFAULT_PREFIX)) {
                 if (!isLoadMore) loadRecentUpdates();
                 return;
-            }
-
-            if (!isLoadMore) {
-                const cachedData = Cache.get(state.searchType, effectiveQuery);
-                if (cachedData) {
-                    state.currentView = 'search';
-                    els.recentTitle.classList.add('hidden');
-                    state.nextCursor = null;
-                    state.nextOffset = 0;
-                    handleSearchResults(cachedData, false);
-                    return; 
-                }
             }
 
             state.isLoading = true;
@@ -695,51 +445,33 @@
             searchAbortController = new AbortController();
 
             if (!isLoadMore) {
-                state.nextCursor = null;
-                state.nextOffset = 0;
+                state.nextCursor = null; // 重置游标
                 showMessage('loading', `正在搜索 "${effectiveQuery}"...`);
             } else {
-                els.loadMoreBtn.disabled = true;
-                els.loadMoreIcon.classList.add('animate-spin');
-                els.loadMoreText.textContent = '正在加载...';
+                els.infiniteSpinner.classList.remove('hidden'); // 显示底部小菊花
             }
 
             try {
-                const userParam = FavManager.userInfo ? `&user=${encodeURIComponent(FavManager.userInfo.name)}` : '';
-                let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(effectiveQuery)}&type=${state.searchType}&limit=${CONFIG.PAGE_LIMIT}${userParam}`;
-                
-                if (state.searchType === 'name') url += `&offset=${state.nextOffset}`;
-                else if (state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
+                // 修复：全面彻底抛弃 offset 参数逻辑，仅使用统一游标机制
+                let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(effectiveQuery)}&type=${state.searchType}&limit=${CONFIG.PAGE_LIMIT}`;
+                if (isLoadMore && state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
 
                 const resp = await fetch(url, { signal: searchAbortController.signal });
                 const data = await resp.json();
-
-                if (data.success && !isLoadMore) {
-                    Cache.set(state.searchType, effectiveQuery, data);
-                }
-
                 handleSearchResults(data, isLoadMore);
 
             } catch (e) {
-                if (e.name === 'AbortError') return;
-                showMessage('error', '连接服务器失败');
+                if (e.name !== 'AbortError') showMessage('error', '连接服务器失败');
             } finally {
-                if (!searchAbortController.signal.aborted) {
-                    state.isLoading = false;
-                    els.loadMoreBtn.disabled = false;
-                    els.loadMoreIcon.classList.remove('animate-spin');
-                    els.loadMoreText.textContent = '加载更多结果';
-                }
+                if (!searchAbortController.signal.aborted) state.isLoading = false;
             }
         }
-
+        
         async function fetchSuggestions(query) {
-            if (!query || state.searchType !== 'id' || !state.isValid) {
-                els.suggestionsBox.classList.add('hidden');
-                return;
+            if (!query || state.searchType !== 'id') {
+                els.suggestionsBox.classList.add('hidden'); return;
             }
             const effectiveQuery = getEffectiveQuery();
-
             if (suggestAbortController) suggestAbortController.abort();
             suggestAbortController = new AbortController();
 
@@ -747,39 +479,51 @@
                 const response = await fetch(`${CONFIG.API_WORKER_URL}/suggest?q=${encodeURIComponent(effectiveQuery)}`, { signal: suggestAbortController.signal });
                 const data = await response.json();
                 
-                if (data.success && data.suggestions) {
+                if (data.success && data.suggestions && data.suggestions.length > 0) {
                     els.suggestionsList.innerHTML = '';
-                    if (data.suggestions.length > 0) {
-                        data.suggestions.forEach(s => {
-                            const li = document.createElement('li');
-                            li.className = 'px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors border-b border-slate-50 last:border-0';
-                            
-                            let displayText = escapeHTML(s);
-                            if (state.isPrefixEnabled && s.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX.toUpperCase())) {
-                                displayText = escapeHTML(s.substring(CONFIG.DEFAULT_PREFIX.length));
-                            }
-                            li.innerHTML = `<span class="text-slate-400 font-medium">${state.isPrefixEnabled ? CONFIG.DEFAULT_PREFIX : ''}</span>${displayText}`;
-                            
-                            li.addEventListener('mousedown', (e) => {
-                                e.preventDefault();
-                                els.searchInput.value = displayText;
-                                els.suggestionsBox.classList.add('hidden');
-                                checkValidation();
-                                performSearch(false);
-                            });
-                            els.suggestionsList.appendChild(li);
+                    data.suggestions.forEach(s => {
+                        const li = document.createElement('li');
+                        li.className = 'px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors border-b border-slate-50 last:border-0';
+                        
+                        let displayText = escapeHTML(s);
+                        if (state.isPrefixEnabled && s.toUpperCase().startsWith(CONFIG.DEFAULT_PREFIX.toUpperCase())) {
+                            displayText = escapeHTML(s.substring(CONFIG.DEFAULT_PREFIX.length));
+                        }
+                        li.innerHTML = `<span class="text-slate-400 font-medium">${state.isPrefixEnabled ? CONFIG.DEFAULT_PREFIX : ''}</span>${displayText}`;
+                        
+                        li.addEventListener('mousedown', (e) => {
+                            e.preventDefault();
+                            els.searchInput.value = displayText;
+                            els.suggestionsBox.classList.add('hidden');
+                            performSearch(false);
                         });
-                        els.suggestionsBox.classList.remove('hidden');
-                    } else {
-                        els.suggestionsBox.classList.add('hidden');
-                    }
+                        els.suggestionsList.appendChild(li);
+                    });
+                    els.suggestionsBox.classList.remove('hidden');
+                } else {
+                    els.suggestionsBox.classList.add('hidden');
                 }
             } catch (e) {}
         }
 
-        // --- 事件监听 ---
+        function loadFavoritesView() {
+            state.currentView = 'favorites';
+            els.searchInput.value = '';
+            els.clearBtn.classList.add('hidden');
+            els.resultsCount.classList.add('hidden');
+            els.loadMoreContainer.classList.add('hidden');
+            els.recentTitle.classList.remove('hidden');
+            
+            document.getElementById('main-section-icon').setAttribute('data-lucide', 'heart');
+            document.getElementById('main-section-icon').className = 'w-6 h-6 text-red-500 mr-2';
+            document.getElementById('main-section-text').textContent = '我的收藏';
+            lucide.createIcons({ root: els.recentTitle });
 
-        // 🌟 修复搜索模式切换的点击交互，补充缺失逻辑
+            if (FavManager.items.length === 0) showMessage('heart', '暂无收藏产品');
+            else renderCards(FavManager.items, false);
+        }
+
+        // --- 事件监听 ---
         document.querySelectorAll('.search-type-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const targetBtn = e.target.closest('.search-type-btn');
@@ -794,17 +538,11 @@
                 els.searchInput.placeholder = state.searchType === 'id' ? "输入编号进行搜索..." : "输入名称/关键词进行搜索...";
                 updatePrefixUI();
                 
-                // 处理已有输入内容，使其适应新的搜索模式
                 let rawVal = els.searchInput.value;
                 if (state.searchType === 'id' && state.isPrefixEnabled) {
                      let upperPrefix = CONFIG.DEFAULT_PREFIX.toUpperCase();
-                     if (rawVal.toUpperCase().startsWith(upperPrefix)) {
-                         els.searchInput.value = rawVal.substring(upperPrefix.length).trimStart();
-                     }
+                     if (rawVal.toUpperCase().startsWith(upperPrefix)) els.searchInput.value = rawVal.substring(upperPrefix.length).trimStart();
                 }
-                
-                checkValidation();
-                updateClearBtnVisibility();
                 els.suggestionsBox.classList.add('hidden');
             });
         });
@@ -814,47 +552,34 @@
             if (state.searchType === 'id' && state.isPrefixEnabled) {
                 let trimmed = rawVal.trimStart();
                 let upperPrefix = CONFIG.DEFAULT_PREFIX.toUpperCase();
-                
                 if (trimmed.toUpperCase().startsWith(upperPrefix)) {
-                    let actualPrefix = trimmed.substring(0, upperPrefix.length);
-                    els.visualPrefix.textContent = actualPrefix;
+                    els.visualPrefix.textContent = trimmed.substring(0, upperPrefix.length);
                     els.searchInput.value = trimmed.substring(upperPrefix.length).trimStart();
                 } else if (els.searchInput.value === '') {
                     els.visualPrefix.textContent = CONFIG.DEFAULT_PREFIX;
                 }
             }
-            checkValidation();
-            updateClearBtnVisibility();
+            els.clearBtn.classList.toggle('hidden', els.searchInput.value === '');
+            
             clearTimeout(state.debounceTimer);
             state.debounceTimer = setTimeout(() => {
                 const val = state.searchType === 'id' ? els.searchInput.value.replace(/\s+/g, '') : els.searchInput.value.trim();
-                // 输入为空时自动关闭联想框
-                if (val) {
-                    fetchSuggestions(val);
-                } else {
-                    els.suggestionsBox.classList.add('hidden');
-                }
+                if (val) fetchSuggestions(val);
+                else els.suggestionsBox.classList.add('hidden');
             }, 300);
         });
 
-        // 🌟 将原有的 keyup 替换为 keydown 并增加 ESC 按键监听
         els.searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                performSearch(false);
-            } else if (e.key === 'Escape') {
-                els.suggestionsBox.classList.add('hidden');
-            }
+            if (e.key === 'Enter') { e.preventDefault(); performSearch(false); }
+            else if (e.key === 'Escape') els.suggestionsBox.classList.add('hidden');
         });
         
         els.searchBtn.addEventListener('click', () => performSearch(false));
-        els.loadMoreBtn.addEventListener('click', () => performSearch(true));
 
         els.clearBtn.addEventListener('click', () => {
             els.searchInput.value = '';
             els.visualPrefix.textContent = CONFIG.DEFAULT_PREFIX;
-            checkValidation();
-            updateClearBtnVisibility();
+            els.clearBtn.classList.add('hidden');
             if (searchAbortController) searchAbortController.abort();
             state.isLoading = false;
             els.suggestionsBox.classList.add('hidden');
@@ -867,46 +592,27 @@
             const card = e.target.closest('.group');
             
             if (favBtn && card) {
-                e.stopPropagation(); 
-                e.preventDefault();  
-                
-                if (!FavManager.userInfo) {
-                    openSyncModal();
-                    return;
-                }
+                e.stopPropagation(); e.preventDefault();  
                 
                 const imgData = {
-                    key: card.dataset.key,
-                    displayName: card.dataset.displayName,
-                    productName: card.dataset.productName,
-                    description: card.dataset.description,
-                    uploaded: card.dataset.uploaded
+                    key: card.dataset.key, displayName: card.dataset.displayName,
+                    productName: card.dataset.productName, description: card.dataset.description
                 };
                 
                 const isAdded = FavManager.toggle(imgData);
-                
                 if (isAdded) {
                     favBtn.classList.add('active');
                     const icon = favBtn.querySelector('svg'); 
-                    if(icon) {
-                        icon.classList.add('heart-beat');
-                        setTimeout(() => icon.classList.remove('heart-beat'), 500);
-                    }
+                    if(icon) { icon.classList.add('heart-beat'); setTimeout(() => icon.classList.remove('heart-beat'), 500); }
                 } else {
                     favBtn.classList.remove('active');
                 }
                 
-                if (state.currentView === 'favorites' && !isAdded) {
-                    loadFavoritesView();
-                }
-
-                syncToCloud();
-
+                if (state.currentView === 'favorites' && !isAdded) loadFavoritesView();
                 return;
             }
 
             if (!card) return;
-            
             const originalUrl = card.dataset.original;
             const modalOptimizedUrl = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=1200,fit=scale-down,format=auto,quality=85/${originalUrl}`;
             
@@ -915,7 +621,6 @@
             
             els.modalImg.src = modalOptimizedUrl; 
             els.modalImg.dataset.fullOrigin = originalUrl;
-
             document.getElementById('modal-title').innerHTML = card.dataset.displayName;
             document.getElementById('modal-product-name').innerHTML = card.dataset.productName;
             document.getElementById('modal-description').innerHTML = card.dataset.description;
@@ -924,162 +629,27 @@
             document.body.classList.add('no-scroll');
         });
 
-        els.modalImg.onload = () => {
-            els.modalImg.classList.remove('opacity-0');
-            document.getElementById('modal-img-loader').classList.add('hidden');
-        };
+        els.modalImg.onload = () => { els.modalImg.classList.remove('opacity-0'); document.getElementById('modal-img-loader').classList.add('hidden'); };
 
         const closeModal = () => { els.modal.classList.add('hidden'); document.body.classList.remove('no-scroll'); };
         document.getElementById('modal-overlay').addEventListener('click', closeModal);
         document.getElementById('modal-close-btn').addEventListener('click', closeModal);
         
-        els.modalImg.addEventListener('click', () => {
-            els.viewerImg.src = els.modalImg.dataset.fullOrigin || els.modalImg.src;
-            els.viewer.classList.remove('hidden');
-        });
-
+        els.modalImg.addEventListener('click', () => { els.viewerImg.src = els.modalImg.dataset.fullOrigin || els.modalImg.src; els.viewer.classList.remove('hidden'); });
         const closeViewer = () => els.viewer.classList.add('hidden');
         document.getElementById('viewer-close-btn').addEventListener('click', closeViewer);
         els.viewer.addEventListener('click', (e) => { if (e.target !== els.viewerImg) closeViewer(); });
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') { closeViewer(); closeModal(); }
-        });
-
-        document.getElementById('nav-home-btn').addEventListener('click', () => {
-            if (state.currentView !== 'recent') {
-                loadRecentUpdates();
-            }
-        });
-        document.getElementById('main-title-logo').addEventListener('click', () => {
-            if (state.currentView !== 'recent') {
-                loadRecentUpdates();
-            }
-        });
-
-        document.getElementById('top-bar-username-container').addEventListener('click', () => openSyncModal());
-        
-        document.getElementById('nav-fav-btn').addEventListener('click', () => {
-            if (!FavManager.userInfo) {
-                openSyncModal();
-                return;
-            }
-
-            if (state.currentView === 'favorites') openSyncModal(); 
-            else loadFavoritesView();
-        });
-
-        function openSyncModal() {
-            if (FavManager.userInfo) {
-                document.getElementById('sync-unbound-view').classList.add('hidden');
-                document.getElementById('sync-bound-view').classList.remove('hidden');
-                document.getElementById('bound-name-display').textContent = FavManager.userInfo.name;
-                document.getElementById('bound-code-display').textContent = FavManager.userInfo.code;
-            } else {
-                document.getElementById('sync-unbound-view').classList.remove('hidden');
-                document.getElementById('sync-bound-view').classList.add('hidden');
-            }
-            els.syncModal.classList.remove('hidden');
-        }
-
-        document.getElementById('btn-generate-code').addEventListener('click', async () => {
-            const nameInput = document.getElementById('sync-new-name');
-            const username = nameInput.value.trim();
-            if (!username) return alert('请输入姓名');
-            
-            const btn = document.getElementById('btn-generate-code');
-            btn.disabled = true; btn.textContent = '生成中...';
-            
-            try {
-                const res = await fetch(`${CONFIG.API_WORKER_URL}/api/sync/generate`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    FavManager.saveUser({ name: data.username, code: data.syncCode });
-                    if (FavManager.items.length > 0) syncToCloud();
-                    openSyncModal();
-                } else { 
-                    alert(data.error); 
-                }
-            } catch (e) { alert('网络错误，请重试'); } finally {
-                btn.disabled = false; btn.textContent = '生成同步码';
-            }
-        });
-
-        document.getElementById('btn-restore-data').addEventListener('click', async () => {
-            const codeInput = document.getElementById('sync-exist-code');
-            const syncCode = codeInput.value.trim();
-            if (syncCode.length !== 6) return alert('请输入完整的6位同步码');
-            
-            const btn = document.getElementById('btn-restore-data');
-            btn.disabled = true; btn.textContent = '拉取中...';
-            
-            try {
-                const res = await fetch(`${CONFIG.API_WORKER_URL}/api/sync/pull?code=${syncCode}`);
-                const data = await res.json();
-                if (data.success) {
-                    FavManager.saveUser({ name: data.username, code: syncCode });
-                    FavManager.items = data.data || [];
-                    FavManager.save();
-                    alert(`欢迎回来，${data.username}！已恢复 ${FavManager.items.length} 条收藏数据。`);
-                    els.syncModal.classList.add('hidden');
-                    loadFavoritesView();
-                } else { alert(data.error); }
-            } catch (e) { alert('网络错误或同步码无效'); } finally {
-                btn.disabled = false; btn.textContent = '恢复数据';
-            }
-        });
-
-        document.getElementById('btn-unbind').addEventListener('click', () => {
-            if (confirm('确认断开绑定吗？断开后将清除本设备的收藏数据。')) {
-                FavManager.items = [];
-                FavManager.saveUser(null);
-                FavManager.save();
-                els.syncModal.classList.add('hidden');
-                if (state.currentView === 'favorites') loadRecentUpdates();
-            }
-        });
-
-        async function syncToCloud() {
-            if (!FavManager.userInfo) return;
-            const btn = document.getElementById('sync-cloud-btn');
-            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 mr-1 animate-spin"></i>同步中...`;
-            try {
-                const res = await fetch(`${CONFIG.API_WORKER_URL}/api/sync/push`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ syncCode: FavManager.userInfo.code, data: FavManager.items })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    btn.innerHTML = `<i data-lucide="check" class="w-4 h-4 mr-1"></i>同步成功`;
-                } else {
-                    btn.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 mr-1"></i>同步失败`;
-                    alert(data.error);
-                }
-            } catch (e) {
-                btn.innerHTML = `<i data-lucide="alert-circle" class="w-4 h-4 mr-1"></i>网络错误`;
-            }
-            lucide.createIcons({ root: btn });
-            setTimeout(() => {
-                btn.innerHTML = `<i data-lucide="cloud-upload" class="w-4 h-4 mr-1"></i>一键同步到云端`;
-                lucide.createIcons({ root: btn });
-            }, 3000);
-        }
-
-        document.getElementById('sync-cloud-btn').addEventListener('click', syncToCloud);
+        document.getElementById('nav-home-btn').addEventListener('click', () => { if (state.currentView !== 'recent') loadRecentUpdates(); });
+        document.getElementById('main-title-logo').addEventListener('click', () => { if (state.currentView !== 'recent') loadRecentUpdates(); });
+        document.getElementById('nav-fav-btn').addEventListener('click', () => { if (state.currentView !== 'favorites') loadFavoritesView(); });
 
         // --- 初始化 ---
         FavManager.updateUI(); 
         lucide.createIcons();
         updatePrefixUI();
-        
         loadRecentUpdates();
-        loadHotSearches(); 
-        
+        loadHotSearches(); // 恢复热门搜索的初始化加载
     });
     </script>
 </body>
