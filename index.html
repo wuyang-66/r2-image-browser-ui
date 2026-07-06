@@ -19,8 +19,6 @@
         }
         @keyframes modal-in { from { opacity: 0; transform: scale(0.95) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        @keyframes heartBeat { 0% { transform: scale(1); } 14% { transform: scale(1.3); } 28% { transform: scale(1); } 42% { transform: scale(1.3); } 70% { transform: scale(1); } }
-        .heart-beat { animation: heartBeat 0.5s ease-in-out; }
         .modal-enter { animation: modal-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .no-scroll { overflow: hidden; }
 
@@ -41,14 +39,6 @@
         #suggestions-box::-webkit-scrollbar { width: 6px; }
         #suggestions-box::-webkit-scrollbar-track { background: #f1f5f9; }
         #suggestions-box::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-
-        .fav-btn {
-            position: absolute; top: 8px; left: 8px; z-index: 20;
-            background: rgba(255, 255, 255, 0.9); border-radius: 50%; padding: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;
-        }
-        .fav-btn:hover { background: #fff; transform: scale(1.1); }
-        .fav-btn.active svg { fill: #ef4444; color: #ef4444; }
     </style>
 </head>
 <body class="antialiased text-slate-800">
@@ -57,10 +47,6 @@
         <div class="flex items-center space-x-2">
             <button id="nav-home-btn" class="flex items-center space-x-1 text-slate-600 hover:text-blue-500 transition-colors bg-slate-100 hover:bg-blue-50 px-3 py-1.5 rounded-full font-medium text-sm">
                 <i data-lucide="home" class="w-4 h-4"></i><span class="hidden sm:inline">首页</span>
-            </button>
-            <button id="nav-fav-btn" class="flex items-center space-x-2 text-slate-600 hover:text-red-500 transition-colors bg-slate-100 hover:bg-red-50 px-3 py-1.5 rounded-full font-medium text-sm">
-                <i data-lucide="heart" class="w-4 h-4"></i><span>我的收藏</span>
-                <span id="fav-count-badge" class="bg-slate-200 text-slate-600 rounded-full px-2 py-0.5 text-xs">0</span>
             </button>
         </div>
     </div>
@@ -120,7 +106,6 @@
 
         <main id="gallery" class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></main>
 
-        <!-- 修复后的无限滚动触发容器：不再随意使用 display:none，确保高度存在以供观察器拦截 -->
         <div id="load-more-container" class="mt-8 mb-12 flex justify-center hidden w-full h-10">
             <div id="infinite-spinner" class="flex items-center space-x-2 text-slate-400 hidden">
                 <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
@@ -162,22 +147,7 @@
             R2_BUCKET_URL: "https://xiaowuya.dpdns.org",
             PAGE_LIMIT: 12,
             DEFAULT_PREFIX: "XC",
-            MAX_CACHE_SIZE: 30 
-        };
-
-        const FavManager = {
-            items: JSON.parse(localStorage.getItem('xc_favorites') || '[]'),
-            save() { localStorage.setItem('xc_favorites', JSON.stringify(this.items)); this.updateUI(); },
-            toggle(imgObj) {
-                const index = this.items.findIndex(item => item.key === imgObj.key);
-                let isAdded = false;
-                if (index > -1) this.items.splice(index, 1);
-                else { this.items.unshift(imgObj); isAdded = true; }
-                this.save();
-                return isAdded;
-            },
-            isFav(key) { return this.items.some(item => item.key === key); },
-            updateUI() { document.getElementById('fav-count-badge').textContent = this.items.length; }
+            MAX_RECENT_LIMIT: 36 // 限制近期更新最多加载 36 条
         };
 
         const state = { 
@@ -186,7 +156,8 @@
             searchType: 'id',
             isValid: true,
             isLoading: false,
-            nextCursor: null, // 统一使用基于 created_at 的 cursor，抛弃 offset
+            nextCursor: null, 
+            nextOffset: 0,
             hasMore: false,
             loadedCount: 0,
             currentView: 'recent'
@@ -218,7 +189,6 @@
             viewerImg: document.getElementById('viewer-image')
         };
 
-        // 修复：IntersectionObserver 触发器现在拥有固定高度，并在此触发
         const observerOptions = { root: null, rootMargin: '300px', threshold: 0.1 };
         const loadMoreObserver = new IntersectionObserver((entries) => {
             const entry = entries[0];
@@ -242,7 +212,7 @@
             els.gallery.innerHTML = '';
             els.resultsCount.classList.add('hidden');
             els.loadMoreContainer.classList.add('hidden');
-            let icon = type === 'loading' ? 'loader-2' : (type === 'error' ? 'alert-triangle' : (type === 'heart' ? 'heart' : 'search'));
+            let icon = type === 'loading' ? 'loader-2' : (type === 'error' ? 'alert-triangle' : 'search');
             let color = type === 'loading' ? 'text-blue-500' : (type === 'error' ? 'text-red-500' : 'text-slate-400');
             els.galleryMsg.innerHTML = `<div class="flex flex-col items-center justify-center min-h-[30vh] text-slate-500">
                 <i data-lucide="${icon}" class="w-12 h-12 ${type === 'loading' ? 'animate-spin' : ''} ${color}"></i>
@@ -284,7 +254,6 @@
                 const versionQuery = img.uploaded ? `?v=${img.uploaded}` : '';
                 const originalUrl = `${CONFIG.R2_BUCKET_URL}/${img.key}${versionQuery}`;
                 
-                // 模糊图生成，作为骨架屏底层
                 const blurThumb = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=40,quality=20,blur=10/${originalUrl}`;
                 const thumb = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=400,height=400,fit=cover,format=auto,quality=75/${originalUrl}`;
                 
@@ -298,13 +267,9 @@
                 card.dataset.productName = escapeHTML(img.productName);
                 card.dataset.description = escapeHTML(img.description || '正在完善中....');
 
-                const isFav = FavManager.isFav(img.key);
                 const newBadge = state.currentView === 'recent' ? `<div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 pointer-events-none">NEW</div>` : '';
 
                 card.innerHTML = `
-                    <button class="fav-btn ${isFav ? 'active' : ''}" title="加入/取消收藏">
-                        <i data-lucide="heart" class="w-5 h-5 text-slate-400 transition-colors"></i>
-                    </button>
                     <div class="relative aspect-square bg-slate-100 overflow-hidden">
                         ${newBadge}
                         <img src="${blurThumb}" class="absolute inset-0 w-full h-full object-cover scale-110 opacity-100 transition-opacity duration-700 pointer-events-none" onerror="this.style.display='none'">
@@ -330,17 +295,27 @@
                 
                 state.hasMore = data.hasMore;
                 state.nextCursor = data.nextCursor;
+                state.nextOffset = data.nextOffset;
 
-                // 修复：当含有更多数据时，开放底部占位容器让 Observer 监听；否则将其完全隐藏
+                // 新增：限制近期更新最多加载 CONFIG.MAX_RECENT_LIMIT (36) 条
+                if (state.currentView === 'recent' && state.loadedCount >= CONFIG.MAX_RECENT_LIMIT) {
+                    state.hasMore = false;
+                }
+
                 if (state.hasMore) {
                     els.loadMoreContainer.classList.remove('hidden');
-                    els.infiniteSpinner.classList.add('hidden'); // 等待 observer 触发时才显示 loading
+                    els.infiniteSpinner.classList.add('hidden'); 
                 } else {
                     els.loadMoreContainer.classList.add('hidden');
                 }
                 
                 if (state.loadedCount > 0) {
-                    let countText = state.hasMore ? `已加载 ${state.loadedCount} 个结果，向下滑动加载更多...` : `共为您找到 ${state.loadedCount} 个结果`;
+                    let countText = '';
+                    if (state.currentView === 'recent' && !state.hasMore && state.loadedCount >= CONFIG.MAX_RECENT_LIMIT) {
+                        countText = `已为您展示最近的 ${state.loadedCount} 个更新记录`;
+                    } else {
+                        countText = state.hasMore ? `已加载 ${state.loadedCount} 个结果，向下滑动加载更多...` : `共为您找到 ${state.loadedCount} 个结果`;
+                    }
                     els.resultsCount.innerHTML = `<div class="flex items-center text-sm text-slate-500"><i data-lucide="check-circle-2" class="w-4 h-4 mr-2 text-teal-500"></i>${countText}</div>`;
                     els.resultsCount.classList.remove('hidden');
                     lucide.createIcons({ root: els.resultsCount });
@@ -355,7 +330,7 @@
         async function loadRecentUpdates(isLoadMore = false) {
             if (!isLoadMore) {
                 state.currentView = 'recent';
-                state.nextCursor = null;
+                state.nextOffset = 0;
                 els.searchInput.value = '';
                 els.clearBtn.classList.add('hidden');
                 els.recentTitle.classList.remove('hidden');
@@ -371,12 +346,12 @@
             if (!isLoadMore) {
                 showMessage('loading', '正在获取最近收录的产品...');
             } else {
-                els.infiniteSpinner.classList.remove('hidden'); // 显示底部小菊花
+                els.infiniteSpinner.classList.remove('hidden'); 
             }
 
             try {
                 let url = `${CONFIG.API_WORKER_URL}/recent?limit=${CONFIG.PAGE_LIMIT}`;
-                if (isLoadMore && state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
+                if (isLoadMore && state.nextOffset) url += `&offset=${state.nextOffset}`;
                 
                 const resp = await fetch(url, { signal: searchAbortController.signal });
                 const data = await resp.json();
@@ -445,16 +420,19 @@
             searchAbortController = new AbortController();
 
             if (!isLoadMore) {
-                state.nextCursor = null; // 重置游标
+                state.nextCursor = null; 
+                state.nextOffset = 0;
                 showMessage('loading', `正在搜索 "${effectiveQuery}"...`);
             } else {
-                els.infiniteSpinner.classList.remove('hidden'); // 显示底部小菊花
+                els.infiniteSpinner.classList.remove('hidden'); 
             }
 
             try {
-                // 修复：全面彻底抛弃 offset 参数逻辑，仅使用统一游标机制
                 let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(effectiveQuery)}&type=${state.searchType}&limit=${CONFIG.PAGE_LIMIT}`;
-                if (isLoadMore && state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
+                if (isLoadMore) {
+                    if (state.searchType === 'name' && state.nextOffset) url += `&offset=${state.nextOffset}`;
+                    else if (state.searchType === 'id' && state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
+                }
 
                 const resp = await fetch(url, { signal: searchAbortController.signal });
                 const data = await resp.json();
@@ -504,23 +482,6 @@
                     els.suggestionsBox.classList.add('hidden');
                 }
             } catch (e) {}
-        }
-
-        function loadFavoritesView() {
-            state.currentView = 'favorites';
-            els.searchInput.value = '';
-            els.clearBtn.classList.add('hidden');
-            els.resultsCount.classList.add('hidden');
-            els.loadMoreContainer.classList.add('hidden');
-            els.recentTitle.classList.remove('hidden');
-            
-            document.getElementById('main-section-icon').setAttribute('data-lucide', 'heart');
-            document.getElementById('main-section-icon').className = 'w-6 h-6 text-red-500 mr-2';
-            document.getElementById('main-section-text').textContent = '我的收藏';
-            lucide.createIcons({ root: els.recentTitle });
-
-            if (FavManager.items.length === 0) showMessage('heart', '暂无收藏产品');
-            else renderCards(FavManager.items, false);
         }
 
         // --- 事件监听 ---
@@ -588,31 +549,9 @@
         });
 
         els.gallery.addEventListener('click', (e) => {
-            const favBtn = e.target.closest('.fav-btn');
             const card = e.target.closest('.group');
-            
-            if (favBtn && card) {
-                e.stopPropagation(); e.preventDefault();  
-                
-                const imgData = {
-                    key: card.dataset.key, displayName: card.dataset.displayName,
-                    productName: card.dataset.productName, description: card.dataset.description
-                };
-                
-                const isAdded = FavManager.toggle(imgData);
-                if (isAdded) {
-                    favBtn.classList.add('active');
-                    const icon = favBtn.querySelector('svg'); 
-                    if(icon) { icon.classList.add('heart-beat'); setTimeout(() => icon.classList.remove('heart-beat'), 500); }
-                } else {
-                    favBtn.classList.remove('active');
-                }
-                
-                if (state.currentView === 'favorites' && !isAdded) loadFavoritesView();
-                return;
-            }
-
             if (!card) return;
+            
             const originalUrl = card.dataset.original;
             const modalOptimizedUrl = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=1200,fit=scale-down,format=auto,quality=85/${originalUrl}`;
             
@@ -642,14 +581,12 @@
 
         document.getElementById('nav-home-btn').addEventListener('click', () => { if (state.currentView !== 'recent') loadRecentUpdates(); });
         document.getElementById('main-title-logo').addEventListener('click', () => { if (state.currentView !== 'recent') loadRecentUpdates(); });
-        document.getElementById('nav-fav-btn').addEventListener('click', () => { if (state.currentView !== 'favorites') loadFavoritesView(); });
 
         // --- 初始化 ---
-        FavManager.updateUI(); 
         lucide.createIcons();
         updatePrefixUI();
         loadRecentUpdates();
-        loadHotSearches(); // 恢复热门搜索的初始化加载
+        loadHotSearches(); 
     });
     </script>
 </body>
