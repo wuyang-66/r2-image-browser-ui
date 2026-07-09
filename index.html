@@ -47,6 +47,21 @@
         #suggestions-box::-webkit-scrollbar { width: 6px; }
         #suggestions-box::-webkit-scrollbar-track { background: #f1f5f9; }
         #suggestions-box::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        /* 优化：触屏设备无法 hover，改为常驻的小徽章提示；鼠标设备保留原有的整体高亮遮罩 */
+        .touch-badge { display: none; }
+        @media (hover: none) {
+            .touch-badge { display: flex; }
+            .hover-overlay { display: none; }
+        }
+
+        /* 优化：常驻搜索栏 - 默认隐藏，滚动过首屏搜索框后由 JS 显示 */
+        #nav-mini-search { opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+        #nav-mini-search.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+        /* 优化：轻量吐司提示，用于"链接已复制"等反馈 */
+        #toast { position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px); opacity: 0; z-index: 70; transition: opacity 0.25s ease, transform 0.25s ease; pointer-events: none; }
+        #toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
     </style>
 </head>
 <body class="antialiased text-slate-800">
@@ -57,7 +72,22 @@
                 <i data-lucide="home" class="w-4 h-4"></i><span class="hidden sm:inline">首页</span>
             </button>
         </div>
+
+        <!-- 优化：常驻搜索栏 - 滚动离开首屏搜索框后自动出现，避免用户为搜索而滚回顶部 -->
+        <div id="nav-mini-search" class="hidden sm:flex items-center flex-1 max-w-sm mx-4">
+            <div class="relative w-full">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                <input type="search" id="nav-search-input" placeholder="快速搜索..." aria-label="快速搜索"
+                       class="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-100 border border-transparent rounded-full focus:ring-2 focus:ring-blue-400 focus:bg-white outline-none transition-all" autocomplete="off">
+            </div>
+        </div>
+        <button id="nav-search-icon-btn" class="sm:hidden flex items-center justify-center w-9 h-9 rounded-full bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-500 transition-colors" aria-label="搜索">
+            <i data-lucide="search" class="w-4 h-4"></i>
+        </button>
     </div>
+
+    <!-- 优化：轻量吐司提示条 -->
+    <div id="toast" class="bg-slate-800 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg"></div>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 mt-10">
         <header class="text-center mb-8 md:mb-12 pt-4">
@@ -102,6 +132,15 @@
             </span>
             <div id="hot-searches-list" class="flex flex-wrap gap-2 items-center"></div>
         </div>
+
+        <!-- 优化：最近搜索历史（本地存储，仅浏览器本机可见） -->
+        <div id="search-history-container" class="max-w-3xl mx-auto mt-3 hidden items-center space-x-2 px-2">
+            <span class="text-sm text-slate-500 flex items-center whitespace-nowrap shrink-0">
+                <i data-lucide="history" class="w-4 h-4 text-slate-400 mr-1"></i>最近搜索：
+            </span>
+            <div id="search-history-list" class="flex flex-wrap gap-2 items-center"></div>
+            <button id="clear-history-btn" class="text-xs text-slate-400 hover:text-red-500 transition-colors shrink-0">清除</button>
+        </div>
         
         <div id="results-count-container" class="max-w-3xl mx-auto mt-6 hidden"></div>
         
@@ -130,11 +169,16 @@
         <div id="modal-content" class="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden modal-enter">
             <div class="w-full md:w-3/5 bg-slate-100 flex items-center justify-center p-4 relative min-h-[300px]">
                 <div id="modal-img-loader" class="absolute inset-0 flex items-center justify-center bg-slate-100 z-10"><i data-lucide="loader-2" class="w-10 h-10 text-blue-500 animate-spin"></i></div>
-                <button id="modal-close-btn" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-30 bg-white/80 shadow-sm rounded-full p-1"><i data-lucide="x" class="w-7 h-7"></i></button>
+                <button id="modal-close-btn" aria-label="关闭详情" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-30 bg-white/80 shadow-sm rounded-full p-1"><i data-lucide="x" class="w-7 h-7"></i></button>
                 <img id="modal-image" src="" alt="详情图片" class="max-w-full max-h-[40vh] md:max-h-[80vh] object-contain relative z-20 opacity-0 transition-opacity duration-300">
             </div>
             <div class="w-full md:w-2/5 p-8 overflow-y-auto">
-                <h2 id="modal-title" class="text-3xl font-bold text-slate-800"></h2>
+                <div class="flex items-start justify-between gap-2">
+                    <h2 id="modal-title" class="text-3xl font-bold text-slate-800"></h2>
+                    <button id="modal-copy-link-btn" aria-label="复制该产品的分享链接" title="复制分享链接" class="flex-shrink-0 mt-1 flex items-center justify-center w-9 h-9 rounded-full bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-blue-500 transition-colors">
+                        <i data-lucide="link-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
                 <div class="mt-6 space-y-4 text-slate-600">
                     <div><h3 class="font-semibold text-slate-800">产品名称</h3><p id="modal-product-name"></p></div>
                     <div><h3 class="font-semibold text-slate-800">功能用途</h3><p id="modal-description" class="whitespace-pre-wrap"></p></div>
@@ -145,7 +189,7 @@
     
     <div id="image-viewer" class="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 hidden transition-opacity duration-300">
         <img id="viewer-image" src="" class="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl"/>
-        <button id="viewer-close-btn" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"><i data-lucide="x" class="w-10 h-10"></i></button>
+        <button id="viewer-close-btn" aria-label="关闭大图" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"><i data-lucide="x" class="w-10 h-10"></i></button>
     </div>
 
     <script>
@@ -207,8 +251,16 @@
             validationMsg: document.getElementById('search-validation-msg'),
             hotSearchesContainer: document.getElementById('hot-searches-container'),
             hotSearchesList: document.getElementById('hot-searches-list'),
+            historyContainer: document.getElementById('search-history-container'),
+            historyList: document.getElementById('search-history-list'),
+            clearHistoryBtn: document.getElementById('clear-history-btn'),
+            navMiniSearch: document.getElementById('nav-mini-search'),
+            navSearchInput: document.getElementById('nav-search-input'),
+            navSearchIconBtn: document.getElementById('nav-search-icon-btn'),
             modal: document.getElementById('modal'),
             modalImg: document.getElementById('modal-image'),
+            modalCopyLinkBtn: document.getElementById('modal-copy-link-btn'),
+            toast: document.getElementById('toast'),
             viewer: document.getElementById('image-viewer'),
             viewerImg: document.getElementById('viewer-image')
         };
@@ -222,6 +274,28 @@
             }
         }, observerOptions);
         loadMoreObserver.observe(els.loadMoreContainer);
+
+        // 优化：常驻搜索栏 - 首屏搜索框滚出视口后，顶部导航栏里的迷你搜索框自动出现
+        const navSearchObserver = new IntersectionObserver((entries) => {
+            const entry = entries[0];
+            els.navMiniSearch.classList.toggle('visible', !entry.isIntersecting);
+        }, { root: null, threshold: 0 });
+        navSearchObserver.observe(els.searchContainer);
+
+        // 迷你搜索框与主搜索框保持内容同步，回车即可直接搜索
+        els.navSearchInput.addEventListener('input', () => { els.searchInput.value = els.navSearchInput.value; });
+        els.navSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                els.searchInput.value = els.navSearchInput.value;
+                performSearch(false);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+        els.navSearchIconBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => els.searchInput.focus(), 300);
+        });
 
         document.addEventListener('click', (e) => {
             if (els.searchContainer && !els.searchContainer.contains(e.target)) els.suggestionsBox.classList.add('hidden');
@@ -243,6 +317,70 @@
                 <p class="mt-4 text-lg text-center">${escapeHTML(message)}</p>
             </div>`;
             lucide.createIcons({ root: els.galleryMsg });
+        }
+
+        // 优化：骨架屏占位卡片，替代"清空画廊+大转圈"式的生硬加载态，观感更连贯、更快
+        function renderSkeletonCards(count = 8) {
+            els.gallery.innerHTML = '';
+            els.galleryMsg.innerHTML = '';
+            els.resultsCount.classList.add('hidden');
+            els.loadMoreContainer.classList.add('hidden');
+            const fragment = document.createDocumentFragment();
+            for (let i = 0; i < count; i++) {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-xl overflow-hidden shadow-md';
+                card.innerHTML = `
+                    <div class="aspect-square img-skeleton"></div>
+                    <div class="p-3 bg-slate-50 space-y-2">
+                        <div class="h-3 w-3/4 mx-auto rounded img-skeleton"></div>
+                        <div class="h-2 w-1/2 mx-auto rounded img-skeleton"></div>
+                    </div>`;
+                fragment.appendChild(card);
+            }
+            els.gallery.appendChild(fragment);
+        }
+
+        // 优化：轻量吐司提示（用于"链接已复制"等一次性反馈）
+        let toastTimer = null;
+        function showToast(message) {
+            els.toast.textContent = message;
+            els.toast.classList.add('visible');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => els.toast.classList.remove('visible'), 2000);
+        }
+
+        // 优化：搜索历史（本地存储，仅本机浏览器可见，不上传服务器）
+        const HISTORY_KEY = 'xc_search_history';
+        const HISTORY_MAX = 8;
+        function getHistory() {
+            try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch (e) { return []; }
+        }
+        function saveHistoryEntry(type, query) {
+            if (!query) return;
+            let list = getHistory().filter(h => !(h.type === type && h.query === query));
+            list.unshift({ type, query });
+            list = list.slice(0, HISTORY_MAX);
+            try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); } catch (e) {}
+            renderHistory();
+        }
+        function renderHistory() {
+            const list = getHistory();
+            if (list.length === 0) { els.historyContainer.classList.add('hidden'); return; }
+            els.historyList.innerHTML = '';
+            list.forEach(h => {
+                const btn = document.createElement('button');
+                btn.className = 'px-3 py-1 text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 rounded-full hover:bg-slate-200 transition-colors cursor-pointer';
+                btn.textContent = h.query;
+                btn.onclick = () => {
+                    document.querySelector(`[data-type="${h.type}"]`).click();
+                    els.searchInput.value = h.type === 'id' ? h.query.replace(new RegExp('^' + CONFIG.DEFAULT_PREFIX, 'i'), '') : h.query;
+                    els.clearBtn.classList.remove('hidden');
+                    performSearch(false);
+                };
+                els.historyList.appendChild(btn);
+            });
+            els.historyContainer.classList.remove('hidden');
+            els.historyContainer.classList.add('flex');
         }
 
         function getEffectiveQuery() {
@@ -284,12 +422,15 @@
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 relative';
                 card.style.animation = `popIn 0.5s ease-out forwards`;
-                
+                card.tabIndex = 0;
+                card.setAttribute('role', 'button');
+
                 card.dataset.original = originalUrl;
                 card.dataset.key = img.key; 
                 card.dataset.displayName = escapeHTML(img.displayName);
                 card.dataset.productName = escapeHTML(img.productName);
                 card.dataset.description = escapeHTML(img.description || '正在完善中....');
+                card.setAttribute('aria-label', `查看 ${card.dataset.productName} 详情`);
 
                 const newBadge = state.currentView === 'recent' ? `<div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 pointer-events-none">NEW</div>` : '';
 
@@ -300,7 +441,10 @@
                         <img src="${thumb}" loading="lazy" decoding="async"
                              class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-300 pointer-events-none"
                              onload="this.style.opacity='1'; this.previousElementSibling.remove();" onerror="this.previousElementSibling.remove(); this.style.display='none';">
-                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none"><p class="text-white font-bold text-lg">查看详情</p></div>
+                        <div class="hover-overlay absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none"><p class="text-white font-bold text-lg">查看详情</p></div>
+                        <div class="touch-badge absolute bottom-2 right-2 items-center gap-1 bg-black/60 text-white text-[11px] font-medium px-2 py-1 rounded-full pointer-events-none">
+                            <i data-lucide="info" class="w-3 h-3"></i>详情
+                        </div>
                     </div>
                     <div class="p-3 bg-slate-50"><p class="text-sm font-semibold text-slate-600 text-center truncate pointer-events-none">${card.dataset.productName}</p><p class="text-xs text-slate-400 text-center mt-1 pointer-events-none">${card.dataset.displayName}</p></div>
                 `;
@@ -356,6 +500,7 @@
                 state.currentView = 'recent';
                 state.nextOffset = 0;
                 els.searchInput.value = '';
+                els.navSearchInput.value = '';
                 els.clearBtn.classList.add('hidden');
                 els.recentTitle.classList.remove('hidden');
                 els.resultsCount.classList.add('hidden'); 
@@ -368,7 +513,7 @@
             searchAbortController = new AbortController();
 
             if (!isLoadMore) {
-                showMessage('loading', '正在获取最近收录的产品...');
+                renderSkeletonCards();
             } else {
                 els.infiniteSpinner.classList.remove('hidden'); 
             }
@@ -427,6 +572,7 @@
 
         async function performSearch(isLoadMore = false) {
             els.suggestionsBox.classList.add('hidden');
+            els.navSearchInput.value = els.searchInput.value;
             
             if (state.isLoading) return;
             const effectiveQuery = getEffectiveQuery();
@@ -445,7 +591,8 @@
             if (!isLoadMore) {
                 state.nextCursor = null; 
                 state.nextOffset = 0;
-                showMessage('loading', `正在搜索 "${effectiveQuery}"...`);
+                renderSkeletonCards();
+                saveHistoryEntry(state.searchType, effectiveQuery);
             } else {
                 els.infiniteSpinner.classList.remove('hidden'); 
             }
@@ -543,6 +690,7 @@
                 }
             }
             els.clearBtn.classList.toggle('hidden', els.searchInput.value === '');
+            els.navSearchInput.value = els.searchInput.value;
             
             clearTimeout(state.debounceTimer);
             state.debounceTimer = setTimeout(() => {
@@ -561,6 +709,7 @@
 
         els.clearBtn.addEventListener('click', () => {
             els.searchInput.value = '';
+            els.navSearchInput.value = '';
             els.visualPrefix.textContent = CONFIG.DEFAULT_PREFIX;
             els.clearBtn.classList.add('hidden');
             if (searchAbortController) searchAbortController.abort();
@@ -585,9 +734,31 @@
             document.getElementById('modal-title').innerHTML = card.dataset.displayName;
             document.getElementById('modal-product-name').innerHTML = card.dataset.productName;
             document.getElementById('modal-description').innerHTML = card.dataset.description;
+            els.modalCopyLinkBtn.dataset.shareQuery = card.dataset.displayName;
             
             els.modal.classList.remove('hidden');
             document.body.classList.add('no-scroll');
+        });
+
+        // 优化：可访问性 - 卡片支持键盘 Tab 聚焦后用 Enter/空格 打开详情
+        els.gallery.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const card = e.target.closest('.group');
+            if (!card) return;
+            e.preventDefault();
+            card.click();
+        });
+
+        // 优化：复制分享链接 - 生成的链接使用"按名称/关键词"搜索，避免编号前缀等逻辑差异导致打开链接搜不到
+        els.modalCopyLinkBtn.addEventListener('click', async () => {
+            const q = els.modalCopyLinkBtn.dataset.shareQuery || '';
+            const shareUrl = `${location.origin}${location.pathname}?type=name&q=${encodeURIComponent(q)}`;
+            try {
+                await navigator.clipboard.writeText(shareUrl);
+                showToast('链接已复制');
+            } catch (e) {
+                showToast('复制失败，请手动复制');
+            }
         });
 
         els.modalImg.onload = () => { els.modalImg.classList.remove('opacity-0'); document.getElementById('modal-img-loader').classList.add('hidden'); };
@@ -601,13 +772,40 @@
         document.getElementById('viewer-close-btn').addEventListener('click', closeViewer);
         els.viewer.addEventListener('click', (e) => { if (e.target !== els.viewerImg) closeViewer(); });
 
+        // 优化：可访问性 - Esc 关闭大图查看器 / 详情弹窗（原来 Esc 只能关闭联想框）
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (!els.viewer.classList.contains('hidden')) closeViewer();
+            else if (!els.modal.classList.contains('hidden')) closeModal();
+        });
+
         document.getElementById('nav-home-btn').addEventListener('click', () => { if (state.currentView !== 'recent') loadRecentUpdates(); });
         document.getElementById('main-title-logo').addEventListener('click', () => { if (state.currentView !== 'recent') loadRecentUpdates(); });
+
+        // 优化：分享链接 - 若 URL 带有 ?type=&q= 参数，打开页面即自动展示对应搜索结果
+        function applyShareLinkIfPresent() {
+            const params = new URLSearchParams(location.search);
+            const q = params.get('q');
+            if (!q) return false;
+            const type = params.get('type') === 'name' ? 'name' : 'id';
+            const targetBtn = document.querySelector(`[data-type="${type}"]`);
+            if (targetBtn && !targetBtn.classList.contains('active')) targetBtn.click();
+            els.searchInput.value = q;
+            els.navSearchInput.value = q;
+            els.clearBtn.classList.remove('hidden');
+            performSearch(false);
+            return true;
+        }
 
         // --- 初始化 ---
         lucide.createIcons();
         updatePrefixUI();
-        loadRecentUpdates();
+        renderHistory();
+        els.clearHistoryBtn.addEventListener('click', () => {
+            try { localStorage.removeItem(HISTORY_KEY); } catch (e) {}
+            renderHistory();
+        });
+        if (!applyShareLinkIfPresent()) loadRecentUpdates();
         loadHotSearches(); 
     });
     </script>
