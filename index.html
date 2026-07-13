@@ -190,11 +190,13 @@
                 </div>
 
                 <!-- 🌟 专属展示区：历史已保存的 AI 参考信息 -->
-                <div id="modal-ai-display-container" class="hidden mt-6 p-4 bg-indigo-50 rounded-xl border border-indigo-100 relative">
-                    <h3 class="font-bold text-indigo-800 mb-2 flex items-center text-sm">
-                        <i data-lucide="sparkles" class="w-4 h-4 mr-1 text-indigo-500"></i> AI 补充参考
-                        <span class="ml-2 text-[11px] font-normal bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">(此内容为AI分析，仅供参考！)</span>
-                    </h3>
+                <div id="modal-ai-display-container" class="hidden mt-6 p-6 bg-indigo-50 rounded-xl border border-indigo-100 relative">
+                    <div class="text-center mb-3">
+                        <h3 class="font-bold text-indigo-800 flex items-center justify-center text-sm">
+                            <i data-lucide="sparkles" class="w-4 h-4 mr-1 text-indigo-500"></i> AI 补充参考
+                        </h3>
+                        <span class="inline-block mt-1.5 text-[11px] font-normal bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">(此内容为AI分析，仅供参考！)</span>
+                    </div>
                     <div id="modal-ai-display-content" class="text-sm text-indigo-900 whitespace-pre-wrap leading-relaxed"></div>
                 </div>
 
@@ -762,7 +764,9 @@
             els.modalImg.dataset.fullOrigin = originalUrl;
             document.getElementById('modal-title').innerHTML = card.dataset.displayName;
             document.getElementById('modal-product-name').innerHTML = card.dataset.productName;
-            document.getElementById('modal-description').innerHTML = card.dataset.description;
+            const hasAiRef = card.dataset.aiReference && card.dataset.aiReference.trim() !== '';
+            const isPlaceholderDesc = card.dataset.description === '正在完善中....' || /^[.\u2026\u3002\uFF0E\u00B7\u2022\s]*$/.test(card.dataset.description || '');
+            document.getElementById('modal-description').innerHTML = (hasAiRef && isPlaceholderDesc) ? '' : card.dataset.description;
             els.modalCopyLinkBtn.dataset.shareQuery = card.dataset.displayName;
             
             // --- 🤖 重置 AI 相关模块 ---
@@ -771,7 +775,7 @@
             els.modalAiBtn.dataset.key = card.dataset.key;
             
             // 检查数据库中是否已存有 AI 参考数据，有就展现出来
-            if (card.dataset.aiReference && card.dataset.aiReference.trim() !== '') {
+            if (hasAiRef) {
                 els.modalAiDisplayContent.innerText = card.dataset.aiReference;
                 els.modalAiDisplayContainer.classList.remove('hidden');
             } else {
@@ -866,6 +870,10 @@
                     els.modalAiDisplayContent.innerText = data.ai_reference;
                     els.modalAiDisplayContainer.classList.remove('hidden');
                     els.modalAiAnalysisContainer.classList.add('hidden');
+
+                    // 若"功能用途"目前展示的仍是占位省略号，保存AI参考后一并清除，避免观感矛盾
+                    const descEl = document.getElementById('modal-description');
+                    if (/^[.\u2026\u3002\uFF0E\u00B7\u2022\s]*$/.test(descEl.innerHTML) || descEl.innerHTML === '正在完善中....') descEl.innerHTML = '';
                 } else {
                     showToast("保存失败: " + (data.error || '未知错误'));
                 }
