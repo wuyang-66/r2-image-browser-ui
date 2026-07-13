@@ -27,7 +27,6 @@
         input[type="search"]::-webkit-search-results-button,
         input[type="search"]::-webkit-search-results-decoration { -webkit-appearance: none; display: none !important; }
 
-        /* 优化：用零请求的 CSS 骨架屏替代"模糊图+清晰图"双图加载，图片请求数减半，加载观感更统一 */
         @keyframes skeleton-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
         .img-skeleton {
             background: linear-gradient(90deg, #eef1f5 25%, #f8fafc 37%, #eef1f5 63%);
@@ -48,20 +47,20 @@
         #suggestions-box::-webkit-scrollbar-track { background: #f1f5f9; }
         #suggestions-box::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
-        /* 优化：触屏设备无法 hover，改为常驻的小徽章提示；鼠标设备保留原有的整体高亮遮罩 */
         .touch-badge { display: none; }
         @media (hover: none) {
             .touch-badge { display: flex; }
             .hover-overlay { display: none; }
         }
 
-        /* 优化：常驻搜索栏 - 默认隐藏，滚动过首屏搜索框后由 JS 显示 */
         #nav-mini-search { opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
         #nav-mini-search.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
-        /* 优化：轻量吐司提示，用于"链接已复制"等反馈 */
         #toast { position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px); opacity: 0; z-index: 70; transition: opacity 0.25s ease, transform 0.25s ease; pointer-events: none; }
         #toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+        
+        /* 针对AI结果的高亮样式 */
+        .ai-key { font-weight: 600; color: #4f46e5; margin-right: 4px; }
     </style>
 </head>
 <body class="antialiased text-slate-800">
@@ -73,7 +72,6 @@
             </button>
         </div>
 
-        <!-- 优化：常驻搜索栏 - 滚动离开首屏搜索框后自动出现，避免用户为搜索而滚回顶部 -->
         <div id="nav-mini-search" class="hidden sm:flex items-center flex-1 max-w-sm mx-4">
             <div class="relative w-full">
                 <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
@@ -133,7 +131,6 @@
             <div id="hot-searches-list" class="flex flex-wrap gap-2 items-center"></div>
         </div>
 
-        <!-- 优化：最近搜索历史（本地存储，仅浏览器本机可见） -->
         <div id="search-history-container" class="max-w-3xl mx-auto mt-3 hidden items-center space-x-2 px-2">
             <span class="text-sm text-slate-500 flex items-center whitespace-nowrap shrink-0">
                 <i data-lucide="history" class="w-4 h-4 text-slate-400 mr-1"></i>最近搜索：
@@ -172,17 +169,48 @@
                 <button id="modal-close-btn" aria-label="关闭详情" class="absolute top-3 right-3 text-slate-500 hover:text-slate-800 transition-colors z-30 bg-white/80 shadow-sm rounded-full p-1"><i data-lucide="x" class="w-7 h-7"></i></button>
                 <img id="modal-image" src="" alt="详情图片" class="max-w-full max-h-[40vh] md:max-h-[80vh] object-contain relative z-20 opacity-0 transition-opacity duration-300">
             </div>
-            <div class="w-full md:w-2/5 p-8 overflow-y-auto">
-                <div class="flex items-start justify-between gap-2">
+            <div class="w-full md:w-2/5 p-8 overflow-y-auto relative">
+                
+                <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-4">
                     <h2 id="modal-title" class="text-3xl font-bold text-slate-800"></h2>
-                    <button id="modal-copy-link-btn" aria-label="复制该产品的分享链接" title="复制分享链接" class="flex-shrink-0 mt-1 flex items-center justify-center w-9 h-9 rounded-full bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-blue-500 transition-colors">
-                        <i data-lucide="link-2" class="w-4 h-4"></i>
-                    </button>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <!-- AI 解析触发按钮 (仅测试人员可用) -->
+                        <button id="modal-ai-btn" class="flex items-center justify-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full shadow hover:shadow-md transition-all">
+                            <i data-lucide="bot" class="w-4 h-4"></i><span class="hidden sm:inline">AI 解析此产品</span>
+                        </button>
+                        <button id="modal-copy-link-btn" aria-label="复制该产品的分享链接" title="复制分享链接" class="flex-shrink-0 mt-1 flex items-center justify-center w-9 h-9 rounded-full bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-blue-500 transition-colors">
+                            <i data-lucide="link-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="mt-6 space-y-4 text-slate-600">
+
+                <div class="mt-4 space-y-4 text-slate-600">
                     <div><h3 class="font-semibold text-slate-800">产品名称</h3><p id="modal-product-name"></p></div>
                     <div><h3 class="font-semibold text-slate-800">功能用途</h3><p id="modal-description" class="whitespace-pre-wrap"></p></div>
                 </div>
+
+                <!-- 🌟 专属展示区：历史已保存的 AI 参考信息 -->
+                <div id="modal-ai-display-container" class="hidden mt-6 p-4 bg-indigo-50 rounded-xl border border-indigo-100 relative">
+                    <h3 class="font-bold text-indigo-800 mb-2 flex items-center text-sm">
+                        <i data-lucide="sparkles" class="w-4 h-4 mr-1 text-indigo-500"></i> AI 补充参考
+                        <span class="ml-2 text-[11px] font-normal bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">(此内容为AI分析，仅供参考！)</span>
+                    </h3>
+                    <div id="modal-ai-display-content" class="text-sm text-indigo-900 whitespace-pre-wrap leading-relaxed"></div>
+                </div>
+
+                <!-- 新解析出来的临时结果及保存区 -->
+                <div id="modal-ai-analysis-container" class="hidden mt-6 p-4 bg-white rounded-xl border-2 border-indigo-200 shadow-lg relative animate-[popIn_0.3s_ease-out]">
+                    <h3 class="font-bold text-indigo-800 mb-3 flex items-center border-b border-indigo-100 pb-2">
+                        <i data-lucide="zap" class="w-5 h-5 mr-1 text-amber-500"></i> 解析预览 (未保存)
+                    </h3>
+                    <div id="modal-ai-analysis-content" class="text-sm text-slate-700 space-y-2 mb-4"></div>
+                    <div class="flex justify-end">
+                        <button id="modal-ai-save-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow transition-colors flex items-center gap-2">
+                            <i data-lucide="save" class="w-4 h-4"></i>是，保存并对所有人展示
+                        </button>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -217,9 +245,9 @@
         
         let searchAbortController = null;
         let suggestAbortController = null;
+        let currentAiData = null; // 缓存供保存使用的 AI 数据
+        let currentTestPwd = '';
 
-        // 优化：轻量内存级请求缓存（60秒有效），避免同一 URL 在短时间内被重复请求
-        // 例如：反复切换"首页 <-> 搜索结果"或误触重复搜索时，直接复用缓存结果
         const responseCache = new Map();
         const CACHE_TTL = 60000;
         async function cachedFetchJSON(url, signal) {
@@ -260,6 +288,12 @@
             modal: document.getElementById('modal'),
             modalImg: document.getElementById('modal-image'),
             modalCopyLinkBtn: document.getElementById('modal-copy-link-btn'),
+            modalAiBtn: document.getElementById('modal-ai-btn'),
+            modalAiSaveBtn: document.getElementById('modal-ai-save-btn'),
+            modalAiDisplayContainer: document.getElementById('modal-ai-display-container'),
+            modalAiDisplayContent: document.getElementById('modal-ai-display-content'),
+            modalAiAnalysisContainer: document.getElementById('modal-ai-analysis-container'),
+            modalAiAnalysisContent: document.getElementById('modal-ai-analysis-content'),
             toast: document.getElementById('toast'),
             viewer: document.getElementById('image-viewer'),
             viewerImg: document.getElementById('viewer-image')
@@ -275,14 +309,12 @@
         }, observerOptions);
         loadMoreObserver.observe(els.loadMoreContainer);
 
-        // 优化：常驻搜索栏 - 首屏搜索框滚出视口后，顶部导航栏里的迷你搜索框自动出现
         const navSearchObserver = new IntersectionObserver((entries) => {
             const entry = entries[0];
             els.navMiniSearch.classList.toggle('visible', !entry.isIntersecting);
         }, { root: null, threshold: 0 });
         navSearchObserver.observe(els.searchContainer);
 
-        // 迷你搜索框与主搜索框保持内容同步，回车即可直接搜索
         els.navSearchInput.addEventListener('input', () => { els.searchInput.value = els.navSearchInput.value; });
         els.navSearchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -319,7 +351,6 @@
             lucide.createIcons({ root: els.galleryMsg });
         }
 
-        // 优化：骨架屏占位卡片，替代"清空画廊+大转圈"式的生硬加载态，观感更连贯、更快
         function renderSkeletonCards(count = 8) {
             els.gallery.innerHTML = '';
             els.galleryMsg.innerHTML = '';
@@ -340,16 +371,14 @@
             els.gallery.appendChild(fragment);
         }
 
-        // 优化：轻量吐司提示（用于"链接已复制"等一次性反馈）
         let toastTimer = null;
         function showToast(message) {
             els.toast.textContent = message;
             els.toast.classList.add('visible');
             clearTimeout(toastTimer);
-            toastTimer = setTimeout(() => els.toast.classList.remove('visible'), 2000);
+            toastTimer = setTimeout(() => els.toast.classList.remove('visible'), 2500);
         }
 
-        // 优化：搜索历史（本地存储，仅本机浏览器可见，不上传服务器）
         const HISTORY_KEY = 'xc_search_history';
         const HISTORY_MAX = 8;
         function getHistory() {
@@ -415,8 +444,6 @@
             images.forEach((img) => {
                 const versionQuery = img.uploaded ? `?v=${img.uploaded}` : '';
                 const originalUrl = `${CONFIG.R2_BUCKET_URL}/${img.key}${versionQuery}`;
-
-                // 优化：单图 + CSS 骨架屏，去掉额外的模糊缩略图请求（每卡片省 1 次网络请求）
                 const thumb = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=400,height=400,fit=cover,format=auto,quality=75/${originalUrl}`;
 
                 const card = document.createElement('div');
@@ -430,6 +457,9 @@
                 card.dataset.displayName = escapeHTML(img.displayName);
                 card.dataset.productName = escapeHTML(img.productName);
                 card.dataset.description = escapeHTML(img.description || '正在完善中....');
+                // ✨ 绑定 AI 参考数据到卡片节点
+                card.dataset.aiReference = img.ai_reference || '';
+                
                 card.setAttribute('aria-label', `查看 ${card.dataset.productName} 详情`);
 
                 const newBadge = state.currentView === 'recent' ? `<div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm z-10 pointer-events-none">NEW</div>` : '';
@@ -465,7 +495,6 @@
                 state.nextCursor = data.nextCursor;
                 state.nextOffset = data.nextOffset;
 
-                // 新增：限制近期更新最多加载 CONFIG.MAX_RECENT_LIMIT (36) 条
                 if (state.currentView === 'recent' && state.loadedCount >= CONFIG.MAX_RECENT_LIMIT) {
                     state.hasMore = false;
                 }
@@ -736,11 +765,120 @@
             document.getElementById('modal-description').innerHTML = card.dataset.description;
             els.modalCopyLinkBtn.dataset.shareQuery = card.dataset.displayName;
             
+            // --- 🤖 重置 AI 相关模块 ---
+            els.modalAiAnalysisContainer.classList.add('hidden');
+            currentAiData = null;
+            els.modalAiBtn.dataset.key = card.dataset.key;
+            
+            // 检查数据库中是否已存有 AI 参考数据，有就展现出来
+            if (card.dataset.aiReference && card.dataset.aiReference.trim() !== '') {
+                els.modalAiDisplayContent.innerText = card.dataset.aiReference;
+                els.modalAiDisplayContainer.classList.remove('hidden');
+            } else {
+                els.modalAiDisplayContainer.classList.add('hidden');
+            }
+            
             els.modal.classList.remove('hidden');
             document.body.classList.add('no-scroll');
         });
 
-        // 优化：可访问性 - 卡片支持键盘 Tab 聚焦后用 Enter/空格 打开详情
+        // --- 🤖 AI 触发解析交互 ---
+        els.modalAiBtn.addEventListener('click', async () => {
+            const pwd = prompt("此为内部测试功能，请输入授权密码：");
+            if (!pwd) return;
+            if (pwd !== 'xc666') { showToast("测试密码错误"); return; }
+
+            const imgKey = els.modalAiBtn.dataset.key;
+            const originalBtnHtml = els.modalAiBtn.innerHTML;
+            
+            els.modalAiBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span class="hidden sm:inline">解析中...</span>`;
+            els.modalAiBtn.disabled = true; 
+            els.modalAiBtn.classList.add('opacity-80', 'cursor-not-allowed');
+            lucide.createIcons({ root: els.modalAiBtn });
+
+            try {
+                const res = await fetch(`${CONFIG.API_WORKER_URL}/api/ai-analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pwd, key: imgKey })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success && data.data) {
+                    currentAiData = data.data;
+                    currentTestPwd = pwd;
+                    
+                    let html = '';
+                    if (currentAiData['产品名称']) html += `<p><span class="ai-key">识别名称:</span> ${currentAiData['产品名称']}</p>`;
+                    if (currentAiData['英文名称']) html += `<p><span class="ai-key">英文名称:</span> ${currentAiData['英文名称']}</p>`;
+                    if (currentAiData['主要功能']) html += `<p><span class="ai-key">主要功能:</span> ${currentAiData['主要功能']}</p>`;
+                    if (currentAiData['适用车型']) html += `<p><span class="ai-key">适用车型:</span> ${currentAiData['适用车型']}</p>`;
+                    
+                    els.modalAiAnalysisContent.innerHTML = html || "<p>未能识别出相关信息</p>";
+                    els.modalAiAnalysisContainer.classList.remove('hidden');
+                    showToast("AI 视觉解析完成！确认无误可保存");
+                } else {
+                    showToast("解析失败: " + (data.error || '未知错误'));
+                }
+            } catch(e) {
+                showToast("网络请求失败，请检查连通性");
+            } finally {
+                els.modalAiBtn.innerHTML = originalBtnHtml;
+                els.modalAiBtn.disabled = false; 
+                els.modalAiBtn.classList.remove('opacity-80', 'cursor-not-allowed');
+                lucide.createIcons({ root: els.modalAiBtn });
+            }
+        });
+
+        // --- 🤖 AI 结果保存（物理隔离逻辑） ---
+        els.modalAiSaveBtn.addEventListener('click', async () => {
+            if (!currentAiData) return;
+            const originalBtnHtml = els.modalAiSaveBtn.innerHTML;
+            
+            els.modalAiSaveBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>保存中...`;
+            els.modalAiSaveBtn.disabled = true; 
+            els.modalAiSaveBtn.classList.add('opacity-80', 'cursor-not-allowed');
+            lucide.createIcons({ root: els.modalAiSaveBtn });
+
+            try {
+                const res = await fetch(`${CONFIG.API_WORKER_URL}/api/ai-save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        password: currentTestPwd,
+                        key: els.modalAiBtn.dataset.key,
+                        aiData: currentAiData
+                    })
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                    showToast("已成功保存AI分析内容，已对所有人可见");
+                    
+                    // 无刷新：把存好的数据同步到卡片的 dataset 里
+                    const currentCard = document.querySelector(`.group[data-key="${els.modalAiBtn.dataset.key}"]`);
+                    if (currentCard) {
+                        currentCard.dataset.aiReference = data.ai_reference;
+                    }
+                    
+                    // 无刷新：展示正式区，隐藏临时区
+                    els.modalAiDisplayContent.innerText = data.ai_reference;
+                    els.modalAiDisplayContainer.classList.remove('hidden');
+                    els.modalAiAnalysisContainer.classList.add('hidden');
+                } else {
+                    showToast("保存失败: " + (data.error || '未知错误'));
+                }
+            } catch(e) {
+                showToast("网络请求异常");
+            } finally {
+                els.modalAiSaveBtn.innerHTML = originalBtnHtml;
+                els.modalAiSaveBtn.disabled = false; 
+                els.modalAiSaveBtn.classList.remove('opacity-80', 'cursor-not-allowed');
+                lucide.createIcons({ root: els.modalAiSaveBtn });
+            }
+        });
+
         els.gallery.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;
             const card = e.target.closest('.group');
@@ -749,7 +887,6 @@
             card.click();
         });
 
-        // 优化：复制分享链接 - 生成的链接使用"按名称/关键词"搜索，避免编号前缀等逻辑差异导致打开链接搜不到
         els.modalCopyLinkBtn.addEventListener('click', async () => {
             const q = els.modalCopyLinkBtn.dataset.shareQuery || '';
             const shareUrl = `${location.origin}${location.pathname}?type=name&q=${encodeURIComponent(q)}`;
@@ -763,7 +900,7 @@
 
         els.modalImg.onload = () => { els.modalImg.classList.remove('opacity-0'); document.getElementById('modal-img-loader').classList.add('hidden'); };
 
-        const closeModal = () => { els.modal.classList.add('hidden'); document.body.classList.remove('no-scroll'); };
+        const closeModal = () => { els.modal.classList.add('hidden'); document.body.classList.remove('no-scroll'); els.modalAiAnalysisContainer.classList.add('hidden'); };
         document.getElementById('modal-overlay').addEventListener('click', closeModal);
         document.getElementById('modal-close-btn').addEventListener('click', closeModal);
         
@@ -772,7 +909,6 @@
         document.getElementById('viewer-close-btn').addEventListener('click', closeViewer);
         els.viewer.addEventListener('click', (e) => { if (e.target !== els.viewerImg) closeViewer(); });
 
-        // 优化：可访问性 - Esc 关闭大图查看器 / 详情弹窗（原来 Esc 只能关闭联想框）
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
             if (!els.viewer.classList.contains('hidden')) closeViewer();
@@ -782,7 +918,6 @@
         document.getElementById('nav-home-btn').addEventListener('click', () => { if (state.currentView !== 'recent') loadRecentUpdates(); });
         document.getElementById('main-title-logo').addEventListener('click', () => { if (state.currentView !== 'recent') loadRecentUpdates(); });
 
-        // 优化：分享链接 - 若 URL 带有 ?type=&q= 参数，打开页面即自动展示对应搜索结果
         function applyShareLinkIfPresent() {
             const params = new URLSearchParams(location.search);
             const q = params.get('q');
@@ -797,7 +932,6 @@
             return true;
         }
 
-        // --- 初始化 ---
         lucide.createIcons();
         updatePrefixUI();
         renderHistory();
