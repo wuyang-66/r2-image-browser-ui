@@ -976,12 +976,14 @@
             if (clipModel) return;
             const status = document.getElementById('image-search-status');
             status.textContent = '首次使用需加载 AI 模型（约 90MB，只加载一次），请稍候...';
-            transformersModule = await import(CONFIG.API_WORKER_URL + '/models/transformers.min.js');
-            transformersModule.env.localModelPath = CONFIG.API_WORKER_URL + '/models/';
+            const modelBase = CONFIG.R2_BUCKET_URL + '/models/';
+            transformersModule = await import(modelBase + 'transformers.min.js');
+            transformersModule.env.localModelPath = modelBase;
+            transformersModule.env.allowLocalModels = true;
             transformersModule.env.allowRemoteModels = false;
-            transformersModule.env.backends.onnx.wasm.wasmPaths = CONFIG.API_WORKER_URL + '/models/';
-            clipProcessor = await transformersModule.AutoProcessor.from_pretrained('clip-vit-base-patch32');
-            clipModel = await transformersModule.CLIPVisionModelWithProjection.from_pretrained('clip-vit-base-patch32', { quantized: true });
+            transformersModule.env.backends.onnx.wasm.wasmPaths = modelBase;
+            clipProcessor = await transformersModule.AutoProcessor.from_pretrained('mobileclip_s0');
+            clipModel = await transformersModule.CLIPVisionModelWithProjection.from_pretrained('mobileclip_s0', { quantized: false, dtype: 'fp32' });
             status.textContent = '';
         }
 
@@ -998,7 +1000,7 @@
             const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
             const raw = await transformersModule.RawImage.fromBlob(blob);
             const inputs = await clipProcessor(raw);
-            const { image_embeds } = await clipModel.getImageFeatures(inputs);
+            const { image_embeds } = await clipModel(inputs);
             const arr = image_embeds && image_embeds.data
                 ? Array.from(image_embeds.data)
                 : Array.isArray(image_embeds) ? image_embeds.flat() : Array.from(image_embeds || []);
