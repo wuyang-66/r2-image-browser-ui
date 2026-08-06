@@ -98,14 +98,14 @@
         <div id="search-type-switcher" class="flex justify-center mb-6 space-x-2">
             <button data-type="id" class="search-type-btn active">按编号搜索</button>
             <button data-type="name" class="search-type-btn">按名称/关键词搜索</button>
-            <button data-type="image" class="search-type-btn">📷 图片搜索</button>
+            <button data-type="image" class="search-type-btn">图片搜索（测试中）</button>
         </div>
 
         <div class="max-w-3xl mx-auto h-6 mb-1 text-center">
             <p id="search-validation-msg" class="text-sm font-medium transition-all duration-200 opacity-0 transform translate-y-1"></p>
         </div>
 
-        <div class="max-w-3xl mx-auto flex items-center space-x-2">
+        <div id="search-row" class="max-w-3xl mx-auto flex items-center space-x-2">
             <div class="relative flex-grow" id="search-container">
                 <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><i data-lucide="search" class="w-5 h-5 text-slate-400"></i></div>
                 <div id="visual-prefix" class="absolute inset-y-0 left-10 flex items-center font-bold text-slate-400 pointer-events-none transition-opacity duration-200">XC</div>
@@ -127,16 +127,25 @@
 
         <!-- 📷 图片搜索上传区（默认隐藏） -->
         <div id="image-search-area" class="max-w-3xl mx-auto hidden">
-            <label id="image-dropzone" class="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-blue-300 rounded-2xl bg-white cursor-pointer hover:bg-blue-50 transition-colors">
-                <i data-lucide="camera" class="w-10 h-10 text-blue-400"></i>
-                <p class="mt-3 text-base font-medium text-slate-600">拍照或上传产品照片</p>
-                <p class="mt-1 text-sm text-slate-400">识别相似编号图，支持 JPG / PNG / WEBP</p>
+            <label id="image-dropzone" class="relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-blue-300 rounded-2xl bg-white cursor-pointer hover:bg-blue-50 transition-colors overflow-hidden">
+                <div id="image-dropzone-prompt" class="absolute inset-0 flex flex-col items-center justify-center">
+                    <i data-lucide="camera" class="w-10 h-10 text-blue-400"></i>
+                    <p class="mt-3 text-base font-medium text-slate-600">拍照或上传产品照片</p>
+                    <p class="mt-1 text-sm text-slate-400">支持 JPG / PNG / WEBP · 点击选择或拖拽到此处</p>
+                </div>
+                <img id="image-preview" src="" alt="查询图片预览" class="hidden w-full h-full object-contain p-2" draggable="false"/>
+                <div id="image-reupload-hint" class="hidden absolute bottom-0 inset-x-0 text-center text-xs text-white bg-black/50 py-1.5 pointer-events-none">点击上传或拖放图片到此处</div>
                 <input type="file" id="image-file-input" accept="image/*" class="hidden"/>
             </label>
-            <div id="image-preview-wrap" class="mt-4 hidden">
-                <img id="image-preview" src="" class="max-h-64 mx-auto rounded-xl shadow border border-slate-200" alt="查询图片预览"/>
-            </div>
             <p id="image-search-status" class="mt-3 text-center text-sm text-slate-500"></p>
+            <div class="mt-4 bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-xs text-slate-500 space-y-1.5 leading-relaxed">
+                <p class="font-semibold text-slate-600">📋 使用说明</p>
+                <p>1. 支持 JPG / PNG / WEBP，建议上传清晰的零件特写或产品照片；</p>
+                <p>2. 拍照时尽量让零件完整入镜、光线充足、背景干净（白色背景识别效果最佳）；</p>
+                <p>3. 系统通过 AI 视觉特征在编号图库中检索，结果按相似度从高到低排序；</p>
+                <p>4. 相似度较低时可能无法准确命中，可尝试更换角度、补充光线或裁剪后重试；</p>
+                <p>5. 首次使用需在浏览器加载 AI 模型（约 66MB，仅一次，之后秒开）；上传图片仅用于匹配，不会对外公开。</p>
+            </div>
         </div>
 
         <div id="hot-searches-container" class="max-w-3xl mx-auto mt-4 hidden items-center space-x-2 px-2 animate-fade-in">
@@ -709,20 +718,32 @@
                 document.querySelectorAll('.search-type-btn').forEach(b => b.classList.remove('active'));
                 targetBtn.classList.add('active');
                 
+                const prevSearchType = state.searchType;
                 state.searchType = targetBtn.dataset.type;
                 state.isPrefixEnabled = (state.searchType === 'id');
 
-                // 📷 图片搜索模式：隐藏输入框，显示上传区
+                // 📷 图片搜索模式：隐藏输入框+搜索按钮，显示上传区
                 const isImage = state.searchType === 'image';
-                els.searchContainer.style.display = isImage ? 'none' : '';
+                document.getElementById('search-row').style.display = isImage ? 'none' : '';
                 document.getElementById('image-search-area').classList.toggle('hidden', !isImage);
                 if (isImage) {
                     els.hotSearchesContainer.classList.add('hidden');
                     els.historyContainer.classList.add('hidden');
                     els.suggestionsBox.classList.add('hidden');
+                    // 干净模式：隐藏首页内容，只保留上传区
+                    els.recentTitle.classList.add('hidden');
+                    els.gallery.innerHTML = '';
+                    els.galleryMsg.innerHTML = '';
+                    els.resultsCount.classList.add('hidden');
+                    els.loadMoreContainer.classList.add('hidden');
+                    state.hasMore = false;
+                    const st = document.getElementById('image-search-status');
+                    if (!document.getElementById('image-preview').src) st.textContent = '请上传一张照片开始搜索';
                 } else {
                     if (els.hotSearchesList.children.length > 0) els.hotSearchesContainer.classList.remove('hidden');
                     renderHistory();
+                    // 仅从图片模式切回时，恢复首页最近更新
+                    if (prevSearchType === 'image') loadRecentUpdates();
                 }
                 
                 els.searchInput.placeholder = state.searchType === 'id' ? "输入编号进行搜索..." : "输入名称/关键词进行搜索...";
@@ -971,11 +992,12 @@
 
         // ===== 📷 以图搜图（浏览器端 CLIP 向量 + Worker 检索） =====
         let clipModel = null, clipProcessor = null, transformersModule = null;
+        let imageSearchBusy = false;
 
         async function loadClipModel() {
             if (clipModel) return;
             const status = document.getElementById('image-search-status');
-            status.textContent = '首次使用需加载 AI 模型（约 90MB，只加载一次），请稍候...';
+            status.textContent = '⏳ 首次使用需加载 AI 模型（约 66MB，仅一次），请耐心等待...';
             const modelBase = CONFIG.R2_BUCKET_URL + '/models/';
             transformersModule = await import(modelBase + 'transformers.min.js');
             transformersModule.env.localModelPath = modelBase;
@@ -984,7 +1006,6 @@
             transformersModule.env.backends.onnx.wasm.wasmPaths = modelBase;
             clipProcessor = await transformersModule.AutoProcessor.from_pretrained('mobileclip_s0');
             clipModel = await transformersModule.CLIPVisionModelWithProjection.from_pretrained('mobileclip_s0', { quantized: false, dtype: 'fp32' });
-            status.textContent = '';
         }
 
         async function computeImageVector(file) {
@@ -1011,11 +1032,25 @@
         async function performImageSearch(file) {
             const status = document.getElementById('image-search-status');
             const preview = document.getElementById('image-preview');
-            const wrap = document.getElementById('image-preview-wrap');
+            const prompt = document.getElementById('image-dropzone-prompt');
+            const reuploadHint = document.getElementById('image-reupload-hint');
+            if (imageSearchBusy) {
+                status.textContent = '⏳ 正在处理上一张图片，请稍候...';
+                return;
+            }
+            imageSearchBusy = true;
+
+            // 预览图显示在框内
             preview.src = URL.createObjectURL(file);
-            wrap.classList.remove('hidden');
+            preview.classList.remove('hidden');
+            prompt.classList.add('hidden');
+            reuploadHint.classList.remove('hidden');
+            imageDropzone.classList.remove('bg-blue-50');
             status.textContent = '⏳ 正在计算图片特征...';
             try {
+                if (!clipModel) {
+                    status.textContent = '⏳ 首次使用正在加载 AI 模型（约 66MB），加载完成后自动搜索...';
+                }
                 const vector = await computeImageVector(file);
                 status.textContent = '⏳ 正在检索相似编号...';
                 const res = await fetch(`${CONFIG.API_WORKER_URL}/api/image-search`, {
@@ -1028,13 +1063,23 @@
                     state.currentView = 'search';
                     els.recentTitle.classList.add('hidden');
                     handleSearchResults(data, false);
-                    status.textContent = '';
+                    status.textContent = '✅ 检索完成（' + ((data.images || []).length) + ' 条结果，按相似度排序）';
+                    els.gallery.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 } else {
-                    status.textContent = '检索失败: ' + (data.error || '未知错误');
+                    status.textContent = '❌ 检索失败: ' + (data.error || '未知错误');
                 }
             } catch (e) {
-                status.textContent = '图片特征计算/检索失败，请重试';
+                const msg = (e && e.message) || String(e);
+                if (/fetch|network|load|onnx|wasm|failed/i.test(msg)) {
+                    status.textContent = '❌ AI 模型/网络加载失败，请检查网络后刷新页面重试';
+                } else if (/image|decode|bitmap|parse|canvas/i.test(msg)) {
+                    status.textContent = '❌ 图片无法识别，请换一张 JPG / PNG 图片';
+                } else {
+                    status.textContent = '❌ 图片特征计算/检索失败，请重试（' + msg.slice(0, 80) + '）';
+                }
                 console.error(e);
+            } finally {
+                imageSearchBusy = false;
             }
         }
 
@@ -1046,12 +1091,19 @@
             if (f) performImageSearch(f);
             e.target.value = '';
         });
-        imageDropzone.addEventListener('dragover', (e) => { e.preventDefault(); imageDropzone.classList.add('bg-blue-50'); });
+        const hasFilesInDrag = (e) => e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files');
+        imageDropzone.addEventListener('dragover', (e) => {
+            if (!hasFilesInDrag(e)) return; // 拖拽预览图等非文件操作不处理
+            e.preventDefault();
+            imageDropzone.classList.add('bg-blue-50');
+        });
         imageDropzone.addEventListener('dragleave', () => imageDropzone.classList.remove('bg-blue-50'));
         imageDropzone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (!files || files.length === 0) return; // 非文件拖放（如拖拽预览图）忽略
             e.preventDefault();
             imageDropzone.classList.remove('bg-blue-50');
-            const f = e.dataTransfer.files[0];
+            const f = files[0];
             if (f) performImageSearch(f);
         });
 
