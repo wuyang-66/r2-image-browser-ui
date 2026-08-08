@@ -98,7 +98,7 @@
         <div id="search-type-switcher" class="flex justify-center mb-6 space-x-2">
             <button data-type="id" class="search-type-btn active">按编号搜索</button>
             <button data-type="name" class="search-type-btn">按名称/关键词搜索</button>
-            <button data-type="image" class="search-type-btn">图片搜索（测试中）</button>
+            <button data-type="image" class="search-type-btn">📷 图片搜索</button>
         </div>
 
         <div class="max-w-3xl mx-auto h-6 mb-1 text-center">
@@ -198,10 +198,6 @@
                 <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-4">
                     <h2 id="modal-title" class="text-3xl font-bold text-slate-800"></h2>
                     <div class="flex items-center gap-2 flex-shrink-0">
-                        <!-- AI 解析触发按钮 (仅测试人员可用) -->
-                        <button id="modal-ai-btn" class="flex items-center justify-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full shadow hover:shadow-md transition-all">
-                            <i data-lucide="bot" class="w-4 h-4"></i><span class="hidden sm:inline">AI 解析此产品</span>
-                        </button>
                         <button id="modal-copy-link-btn" aria-label="复制该产品的分享链接" title="复制分享链接" class="flex-shrink-0 mt-1 flex items-center justify-center w-9 h-9 rounded-full bg-slate-100 hover:bg-blue-50 text-slate-500 hover:text-blue-500 transition-colors">
                             <i data-lucide="link-2" class="w-4 h-4"></i>
                         </button>
@@ -222,19 +218,6 @@
                         <span class="inline-block mt-1.5 text-[11px] font-normal bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">(此内容为AI分析，仅供参考！)</span>
                     </div>
                     <div id="modal-ai-display-content" class="text-sm text-indigo-900 whitespace-pre-wrap leading-relaxed"></div>
-                </div>
-
-                <!-- 新解析出来的临时结果及保存区 -->
-                <div id="modal-ai-analysis-container" class="hidden mt-6 p-4 bg-white rounded-xl border-2 border-indigo-200 shadow-lg relative animate-[popIn_0.3s_ease-out]">
-                    <h3 class="font-bold text-indigo-800 mb-3 flex items-center border-b border-indigo-100 pb-2">
-                        <i data-lucide="zap" class="w-5 h-5 mr-1 text-amber-500"></i> 解析预览 (未保存)
-                    </h3>
-                    <div id="modal-ai-analysis-content" class="text-sm text-slate-700 space-y-2 mb-4"></div>
-                    <div class="flex justify-end">
-                        <button id="modal-ai-save-btn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow transition-colors flex items-center gap-2">
-                            <i data-lucide="save" class="w-4 h-4"></i>是，保存并对所有人展示
-                        </button>
-                    </div>
                 </div>
 
             </div>
@@ -271,45 +254,6 @@
         
         let searchAbortController = null;
         let suggestAbortController = null;
-        let currentAiData = null; // 缓存供保存使用的 AI 数据
-        let currentTestPwd = '';
-
-        // 🌟 稳定设备标识：用于后台日志辨别"同一用户"（localStorage 持久化，换 IP/清 cookie 仍可关联）
-        let CLIENT_ID = '';
-        try {
-            CLIENT_ID = localStorage.getItem('xc_client_id');
-            if (!CLIENT_ID) {
-                CLIENT_ID = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-                localStorage.setItem('xc_client_id', CLIENT_ID);
-            }
-        } catch (e) {
-            CLIENT_ID = 'u' + Date.now().toString(36);
-        }
-
-        // 把搜索图片压缩成小缩略图（base64），随图片搜索一起上报，供后台记录分析
-        function downscaleImageToDataURL(file, maxSize = 320, quality = 0.7) {
-            return new Promise((resolve, reject) => {
-                const url = URL.createObjectURL(file);
-                const img = new Image();
-                img.onload = () => {
-                    try {
-                        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-                        const c = document.createElement('canvas');
-                        c.width = Math.max(1, Math.round(img.width * scale));
-                        c.height = Math.max(1, Math.round(img.height * scale));
-                        const ctx = c.getContext('2d');
-                        ctx.drawImage(img, 0, 0, c.width, c.height);
-                        URL.revokeObjectURL(url);
-                        resolve(c.toDataURL('image/jpeg', quality));
-                    } catch (e2) {
-                        URL.revokeObjectURL(url);
-                        reject(e2);
-                    }
-                };
-                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片解析失败')); };
-                img.src = url;
-            });
-        }
 
         const responseCache = new Map();
         const CACHE_TTL = 60000;
@@ -351,12 +295,8 @@
             modal: document.getElementById('modal'),
             modalImg: document.getElementById('modal-image'),
             modalCopyLinkBtn: document.getElementById('modal-copy-link-btn'),
-            modalAiBtn: document.getElementById('modal-ai-btn'),
-            modalAiSaveBtn: document.getElementById('modal-ai-save-btn'),
             modalAiDisplayContainer: document.getElementById('modal-ai-display-container'),
             modalAiDisplayContent: document.getElementById('modal-ai-display-content'),
-            modalAiAnalysisContainer: document.getElementById('modal-ai-analysis-container'),
-            modalAiAnalysisContent: document.getElementById('modal-ai-analysis-content'),
             toast: document.getElementById('toast'),
             viewer: document.getElementById('image-viewer'),
             viewerImg: document.getElementById('viewer-image')
@@ -692,7 +632,6 @@
 
             try {
                 let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(effectiveQuery)}&type=${state.searchType}&limit=${CONFIG.PAGE_LIMIT}`;
-                url += `&cid=${encodeURIComponent(CLIENT_ID)}`;
                 if (isLoadMore) {
                     if (state.searchType === 'name' && state.nextOffset) url += `&offset=${state.nextOffset}`;
                     else if (state.searchType === 'id' && state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
@@ -857,11 +796,6 @@
             document.getElementById('modal-description').innerHTML = (hasAiRef && isPlaceholderDesc) ? '' : card.dataset.description;
             els.modalCopyLinkBtn.dataset.shareQuery = card.dataset.displayName;
             
-            // --- 🤖 重置 AI 相关模块 ---
-            els.modalAiAnalysisContainer.classList.add('hidden');
-            currentAiData = null;
-            els.modalAiBtn.dataset.key = card.dataset.key;
-            
             // 检查数据库中是否已存有 AI 参考数据，有就展现出来
             if (hasAiRef) {
                 els.modalAiDisplayContent.innerText = card.dataset.aiReference;
@@ -875,106 +809,6 @@
         });
 
         // --- 🤖 AI 触发解析交互 ---
-        els.modalAiBtn.addEventListener('click', async () => {
-            const pwd = prompt("此为内部测试功能，请输入授权密码：");
-            if (!pwd) return;
-            if (pwd !== 'xc666') { showToast("测试密码错误"); return; }
-
-            const imgKey = els.modalAiBtn.dataset.key;
-            const originalBtnHtml = els.modalAiBtn.innerHTML;
-            
-            els.modalAiBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span class="hidden sm:inline">解析中...</span>`;
-            els.modalAiBtn.disabled = true; 
-            els.modalAiBtn.classList.add('opacity-80', 'cursor-not-allowed');
-            lucide.createIcons({ root: els.modalAiBtn });
-
-            try {
-                const res = await fetch(`${CONFIG.API_WORKER_URL}/api/ai-analyze`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: pwd, key: imgKey })
-                });
-                
-                const data = await res.json();
-                
-                if (data.success && data.data) {
-                    currentAiData = data.data;
-                    currentTestPwd = pwd;
-                    
-                    let html = '';
-                    if (currentAiData['产品名称']) html += `<p><span class="ai-key">识别名称:</span> ${currentAiData['产品名称']}</p>`;
-                    if (currentAiData['英文名称']) html += `<p><span class="ai-key">英文名称:</span> ${currentAiData['英文名称']}</p>`;
-                    if (currentAiData['主要功能']) html += `<p><span class="ai-key">主要功能:</span> ${currentAiData['主要功能']}</p>`;
-                    if (currentAiData['适用车型']) html += `<p><span class="ai-key">适用车型:</span> ${currentAiData['适用车型']}</p>`;
-                    
-                    els.modalAiAnalysisContent.innerHTML = html || "<p>未能识别出相关信息</p>";
-                    els.modalAiAnalysisContainer.classList.remove('hidden');
-                    showToast("AI 视觉解析完成！确认无误可保存");
-                } else {
-                    showToast("解析失败: " + (data.error || '未知错误'));
-                }
-            } catch(e) {
-                showToast("网络请求失败，请检查连通性");
-            } finally {
-                els.modalAiBtn.innerHTML = originalBtnHtml;
-                els.modalAiBtn.disabled = false; 
-                els.modalAiBtn.classList.remove('opacity-80', 'cursor-not-allowed');
-                lucide.createIcons({ root: els.modalAiBtn });
-            }
-        });
-
-        // --- 🤖 AI 结果保存（物理隔离逻辑） ---
-        els.modalAiSaveBtn.addEventListener('click', async () => {
-            if (!currentAiData) return;
-            const originalBtnHtml = els.modalAiSaveBtn.innerHTML;
-            
-            els.modalAiSaveBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>保存中...`;
-            els.modalAiSaveBtn.disabled = true; 
-            els.modalAiSaveBtn.classList.add('opacity-80', 'cursor-not-allowed');
-            lucide.createIcons({ root: els.modalAiSaveBtn });
-
-            try {
-                const res = await fetch(`${CONFIG.API_WORKER_URL}/api/ai-save`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        password: currentTestPwd,
-                        key: els.modalAiBtn.dataset.key,
-                        aiData: currentAiData
-                    })
-                });
-                
-                const data = await res.json();
-                if (data.success) {
-                    showToast("已成功保存AI分析内容，已对所有人可见");
-                    
-                    // 无刷新：把存好的数据同步到卡片的 dataset 里
-                    const currentCard = document.querySelector(`.group[data-key="${els.modalAiBtn.dataset.key}"]`);
-                    if (currentCard) {
-                        currentCard.dataset.aiReference = data.ai_reference;
-                    }
-                    
-                    // 无刷新：展示正式区，隐藏临时区
-                    els.modalAiDisplayContent.innerText = data.ai_reference;
-                    els.modalAiDisplayContainer.classList.remove('hidden');
-                    els.modalAiAnalysisContainer.classList.add('hidden');
-
-                    // 若"功能用途"目前展示的仍是占位省略号，保存AI参考后一并清除，避免观感矛盾
-                    const descEl = document.getElementById('modal-description');
-                    if (/^[.\u2026\u3002\uFF0E\u00B7\u2022\s]*$/.test(descEl.innerHTML) || descEl.innerHTML === '正在完善中....') descEl.innerHTML = '';
-                } else {
-                    showToast("保存失败: " + (data.error || '未知错误'));
-                }
-            } catch(e) {
-                showToast("网络请求异常");
-            } finally {
-                els.modalAiSaveBtn.innerHTML = originalBtnHtml;
-                els.modalAiSaveBtn.disabled = false; 
-                els.modalAiSaveBtn.classList.remove('opacity-80', 'cursor-not-allowed');
-                lucide.createIcons({ root: els.modalAiSaveBtn });
-            }
-        });
-
         els.gallery.addEventListener('keydown', (e) => {
             if (e.key !== 'Enter' && e.key !== ' ') return;
             const card = e.target.closest('.group');
@@ -996,7 +830,7 @@
 
         els.modalImg.onload = () => { els.modalImg.classList.remove('opacity-0'); document.getElementById('modal-img-loader').classList.add('hidden'); };
 
-        const closeModal = () => { els.modal.classList.add('hidden'); document.body.classList.remove('no-scroll'); els.modalAiAnalysisContainer.classList.add('hidden'); };
+        const closeModal = () => { els.modal.classList.add('hidden'); document.body.classList.remove('no-scroll'); };
         document.getElementById('modal-overlay').addEventListener('click', closeModal);
         document.getElementById('modal-close-btn').addEventListener('click', closeModal);
         
@@ -1091,12 +925,10 @@
                 }
                 const vector = await computeImageVector(file);
                 status.textContent = '⏳ 正在检索相似编号...';
-                let searchImage = null;
-                try { searchImage = await downscaleImageToDataURL(file); } catch (e) { console.error(e); }
                 const res = await fetch(`${CONFIG.API_WORKER_URL}/api/image-search`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ vector, client_id: CLIENT_ID, image: searchImage })
+                    body: JSON.stringify({ vector })
                 });
                 const data = await res.json();
                 if (data.success) {
