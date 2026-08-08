@@ -98,7 +98,7 @@
         <div id="search-type-switcher" class="flex justify-center mb-6 space-x-2">
             <button data-type="id" class="search-type-btn active">按编号搜索</button>
             <button data-type="name" class="search-type-btn">按名称/关键词搜索</button>
-            <button data-type="image" class="search-type-btn">图片搜索（测试中）</button>
+            <button data-type="image" class="search-type-btn">📷 图片搜索</button>
         </div>
 
         <div class="max-w-3xl mx-auto h-6 mb-1 text-center">
@@ -273,6 +273,43 @@
         let suggestAbortController = null;
         let currentAiData = null; // 缓存供保存使用的 AI 数据
         let currentTestPwd = '';
+
+        // 🌟 稳定设备标识：用于后台日志辨别"同一用户"（localStorage 持久化，换 IP/清 cookie 仍可关联）
+        let CLIENT_ID = '';
+        try {
+            CLIENT_ID = localStorage.getItem('xc_client_id');
+            if (!CLIENT_ID) {
+                CLIENT_ID = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+                localStorage.setItem('xc_client_id', CLIENT_ID);
+            }
+        } catch (e) {
+            CLIENT_ID = 'u' + Date.now().toString(36);
+        }
+
+        // 把搜索图片压缩成小缩略图（base64），随图片搜索一起上报，供后台记录分析
+        function downscaleImageToDataURL(file, maxSize = 320, quality = 0.7) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+                        const c = document.createElement('canvas');
+                        c.width = Math.max(1, Math.round(img.width * scale));
+                        c.height = Math.max(1, Math.round(img.height * scale));
+                        const ctx = c.getContext('2d');
+                        ctx.drawImage(img, 0, 0, c.width, c.height);
+                        URL.revokeObjectURL(url);
+                        resolve(c.toDataURL('image/jpeg', quality));
+                    } catch (e2) {
+                        URL.revokeObjectURL(url);
+                        reject(e2);
+                    }
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片解析失败')); };
+                img.src = url;
+            });
+        }
 
         const responseCache = new Map();
         const CACHE_TTL = 60000;
@@ -655,6 +692,7 @@
 
             try {
                 let url = `${CONFIG.API_WORKER_URL}/search?q=${encodeURIComponent(effectiveQuery)}&type=${state.searchType}&limit=${CONFIG.PAGE_LIMIT}`;
+                url += `&cid=${encodeURIComponent(CLIENT_ID)}`;
                 if (isLoadMore) {
                     if (state.searchType === 'name' && state.nextOffset) url += `&offset=${state.nextOffset}`;
                     else if (state.searchType === 'id' && state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
@@ -1053,10 +1091,12 @@
                 }
                 const vector = await computeImageVector(file);
                 status.textContent = '⏳ 正在检索相似编号...';
+                let searchImage = null;
+                try { searchImage = await downscaleImageToDataURL(file); } catch (e) { console.error(e); }
                 const res = await fetch(`${CONFIG.API_WORKER_URL}/api/image-search`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ vector })
+                    body: JSON.stringify({ vector, client_id: CLIENT_ID, image: searchImage })
                 });
                 const data = await res.json();
                 if (data.success) {
