@@ -139,8 +139,8 @@
             </label>
             <p id="image-search-status" class="mt-3 text-center text-sm text-slate-500"></p>
             <div class="mt-4 bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-xs text-slate-500 space-y-1.5 leading-relaxed">
-                <p class="font-semibold text-slate-600">使用说明</p>
-               <p>1. 支持 JPG / PNG / WEBP，建议上传清晰的单个零件、展开的盒装照片或有辨识度的零件；</p>
+                <p class="font-semibold text-slate-600">使用说明：</p>
+                <p>1. 支持 JPG / PNG / WEBP，建议上传清晰的单个零件、展开的盒装照片或有辨识度的零件；</p>
                 <p>2. 拍照时尽量让零件完整入镜、光线充足、背景干净（白色背景识别效果最佳）；</p>
                 <p>3. 系统通过 AI 视觉特征在编号图库中检索，结果按相似度从高到低排序；</p>
                 <p>4. 相似度较低时可能无法准确命中，可尝试更换角度、补充光线或裁剪后重试；</p>
@@ -868,23 +868,156 @@
         let clipModel = null, clipProcessor = null, transformersModule = null;
         let imageSearchBusy = false;
 
+        // ===== 45MB 模型分片下载：断点续传 + 自动重试 + IndexedDB 持久缓存 =====
+        const MODEL_ONNX_URL = `${CONFIG.R2_BUCKET_URL}/models/mobileclip_s0/onnx/vision_model.onnx`;
+        const MODEL_PARTS_MANIFEST = `${CONFIG.R2_BUCKET_URL}/models/mobileclip_s0/onnx/vision_model.onnx.parts.json`;
+        let modelBytesPromise = null;
+        let idbPromise = null;
+
+        function openModelDB() {
+            if (idbPromise) return idbPromise;
+            idbPromise = new Promise((resolve, reject) => {
+                try {
+                    const req = indexedDB.open('xc_clip_cache', 1);
+                    req.onupgradeneeded = () => { req.result.createObjectStore('files'); };
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                } catch (e) { reject(e); }
+            });
+            return idbPromise;
+        }
+
+        async function idbGet(key) {
+            try {
+                const db = await openModelDB();
+                return await new Promise((resolve) => {
+                    const tx = db.transaction('files', 'readonly');
+                    const rq = tx.objectStore('files').get(key);
+                    rq.onsuccess = () => resolve(rq.result || null);
+                    rq.onerror = () => resolve(null);
+                });
+            } catch (e) { return null; }
+        }
+
+        async function idbSet(key, val) {
+            try {
+                const db = await openModelDB();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction('files', 'readwrite');
+                    tx.objectStore('files').put(val, key);
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+                return true;
+            } catch (e) { return false; }
+        }
+
+        async function fetchModelBytes(onPartProgress) {
+            // 1) IndexedDB 缓存命中则直接使用（第二次打开秒开）
+            try {
+                const cached = await idbGet('mobileclip_s0_v1');
+                if (cached && cached.bytes && cached.bytes.length === cached.size) return cached.bytes;
+            } catch (e) {}
+
+            // 2) 读取分片清单
+            const manifestRes = await fetch(MODEL_PARTS_MANIFEST, { cache: 'force-cache' });
+            if (!manifestRes.ok) throw new Error('模型清单加载失败');
+            const manifest = await manifestRes.json();
+            const { size, parts } = manifest;
+
+            // 3) 逐片下载，每片失败自动重试 3 次（断点续传：已成功的分片不重下）
+            const chunks = new Array(parts);
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            let done = 0;
+            for (let i = 0; i < parts; i++) {
+                let buf = null;
+                for (let attempt = 0; attempt < 3 && !buf; attempt++) {
+                    try {
+                        const url = `${CONFIG.R2_BUCKET_URL}/models/mobileclip_s0/onnx/vision_model.onnx.part${String(i).padStart(4, '0')}`;
+                        const res = await fetch(url, { cache: 'force-cache' });
+                        if (res.ok) {
+                            const ab = await res.arrayBuffer();
+                            if (ab.byteLength > 0) buf = new Uint8Array(ab);
+                        }
+                    } catch (e) {}
+                    if (!buf && attempt < 2) await sleep(1000 * (attempt + 1));
+                }
+                if (!buf) throw new Error('模型分片 ' + (i + 1) + '/' + parts + ' 下载失败');
+                chunks[i] = buf;
+                done++;
+                if (onPartProgress) onPartProgress(done, parts);
+            }
+
+            // 4) 拼接并校验总长度
+            const total = chunks.reduce((s, c) => s + c.length, 0);
+            if (total !== size) throw new Error('模型下载不完整（' + total + '/' + size + '），请重试');
+            const merged = new Uint8Array(total);
+            let off = 0;
+            for (const c of chunks) { merged.set(c, off); off += c.length; }
+
+            // 5) 写入 IndexedDB 持久缓存，并申请持久化存储
+            await idbSet('mobileclip_s0_v1', { bytes: merged, size });
+            if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist(); } catch (e) {} }
+            return merged;
+        }
+
         async function loadClipModel() {
             if (clipModel) return;
             const status = document.getElementById('image-search-status');
-            status.textContent = '⏳ 首次使用需加载 AI 模型（约 66MB，仅一次），请耐心等待...';
             const modelBase = CONFIG.R2_BUCKET_URL + '/models/';
-            transformersModule = await import(modelBase + 'transformers.min.js');
-            transformersModule.env.localModelPath = modelBase;
-            transformersModule.env.allowLocalModels = true;
-            transformersModule.env.allowRemoteModels = false;
-            transformersModule.env.backends.onnx.wasm.wasmPaths = modelBase;
-            const onProgress = (p) => {
-                if (!p || p.status !== 'progress' || !p.file) return;
-                const pct = typeof p.progress === 'number' ? Math.round(p.progress * 100) : 0;
-                status.textContent = `⏳ 正在加载 AI 模型 ${p.file} ${pct}%...`;
+            const loadOnce = async () => {
+                transformersModule = await import(modelBase + 'transformers.min.js');
+                transformersModule.env.localModelPath = modelBase;
+                transformersModule.env.allowLocalModels = true;
+                transformersModule.env.allowRemoteModels = false;
+                transformersModule.env.backends.onnx.wasm.wasmPaths = modelBase;
+                // 移动端网络/内存更脆弱，强制单线程减少占用与崩溃
+                if (transformersModule.env.backends && transformersModule.env.backends.onnx && transformersModule.env.backends.onnx.wasm) {
+                    transformersModule.env.backends.onnx.wasm.numThreads = 1;
+                }
+                const onProgress = (p) => {
+                    if (!p || p.status !== 'progress' || !p.file) return;
+                    const pct = typeof p.progress === 'number' ? Math.round(p.progress * 100) : 0;
+                    status.textContent = `⏳ 正在加载 AI 模型 ${p.file} ${pct}%...`;
+                };
+                // 大模型文件走分片下载（断点续传 + 重试 + 持久缓存），其它小文件走普通请求
+                transformersModule.env.fetch = async (url, options) => {
+                    const u = String(url).split('?')[0];
+                    if (u === MODEL_ONNX_URL) {
+                        if (!modelBytesPromise) {
+                            modelBytesPromise = fetchModelBytes((done, total) => {
+                                status.textContent = `⏳ 正在下载 AI 模型 ${Math.round(done / total * 100)}%（分片 ${done}/${total}，断点续传，约 45MB）...`;
+                            });
+                        }
+                        const bytes = await modelBytesPromise;
+                        return new Response(bytes, { status: 200, headers: { 'Content-Type': 'application/octet-stream' } });
+                    }
+                    return fetch(u, options);
+                };
+                clipProcessor = await transformersModule.AutoProcessor.from_pretrained('mobileclip_s0', { progress_callback: onProgress });
+                // 全精度 fp32（45MB）：量化版经实测严重损失准确率，不可使用
+                clipModel = await transformersModule.CLIPVisionModelWithProjection.from_pretrained('mobileclip_s0', { quantized: false, dtype: 'fp32', progress_callback: onProgress });
             };
-            clipProcessor = await transformersModule.AutoProcessor.from_pretrained('mobileclip_s0', { progress_callback: onProgress });
-            clipModel = await transformersModule.CLIPVisionModelWithProjection.from_pretrained('mobileclip_s0', { quantized: false, dtype: 'fp32', progress_callback: onProgress });
+            status.textContent = '⏳ 首次使用需加载 AI 模型（约 45MB），请耐心等待...';
+            try {
+                await loadOnce();
+            } catch (e) {
+                console.warn('AI 模型首次加载失败，自动重试一次：', e);
+                clipProcessor = null; clipModel = null; transformersModule = null; modelBytesPromise = null;
+                status.textContent = '⏳ 加载中断，正在自动重试（第 2 次）...';
+                await loadOnce();
+            }
+        }
+
+        // 页面空闲时后台预下载模型，用户搜索时通常已就绪
+        function prefetchClipModel() {
+            if (!('indexedDB' in window)) return;
+            if (navigator.onLine === false) return;
+            const start = () => {
+                modelBytesPromise = fetchModelBytes(null).catch((e) => { modelBytesPromise = null; throw e; });
+            };
+            if ('requestIdleCallback' in window) requestIdleCallback(() => start(), { timeout: 6000 });
+            else setTimeout(start, 2000);
         }
 
         // 统一图片解码：优先 createImageBitmap，iOS/WebView 不支持时回退到 <img> 解码
@@ -991,7 +1124,7 @@
             let searchTimer = null;
             try {
                 if (!clipModel) {
-                    status.textContent = '⏳ 首次使用正在加载 AI 模型（约 66MB），加载完成后自动搜索...';
+                    status.textContent = '⏳ 首次使用正在加载 AI 模型，加载完成后自动搜索...';
                 }
                 const vector = await computeImageVector(file);
                 status.textContent = '⏳ 正在检索相似编号...';
@@ -1022,7 +1155,7 @@
                 }
                 const msg = (e && e.message) || String(e);
                 if (/fetch|network|load|onnx|wasm|failed/i.test(msg)) {
-                    status.textContent = '❌ AI 模型/网络加载失败，请检查网络后刷新页面重试';
+                    status.textContent = '❌ AI 模型/网络加载失败，已自动重试仍失败。建议：连接 Wi-Fi 后重试，或改用 Chrome/夸克浏览器，或清理浏览器缓存';
                 } else if (/image|decode|bitmap|parse|canvas/i.test(msg)) {
                     status.textContent = '❌ 图片无法识别，请换一张 JPG / PNG 图片';
                 } else {
@@ -1073,6 +1206,7 @@
         });
         if (!applyShareLinkIfPresent()) loadRecentUpdates();
         loadHotSearches(); 
+        prefetchClipModel(); // 空闲时后台预下载模型，减少首次搜索等待
     });
     </script>
 </body>
