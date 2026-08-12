@@ -6,8 +6,8 @@
     <title>迅驰工具在线查询</title>
     <link rel="preconnect" href="https://xiaowuyang.dpdns.org">
     <link rel="preconnect" href="https://xiaowuya.dpdns.org">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+    <script src="https://unpkg.com/lucide@1.22.0"></script>
     <style>
         :root {
             --brand-color-from: #3b82f6;
@@ -127,20 +127,20 @@
 
         <!-- 📷 图片搜索上传区（默认隐藏） -->
         <div id="image-search-area" class="max-w-3xl mx-auto hidden">
-            <label id="image-dropzone" class="relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-blue-300 rounded-2xl bg-white cursor-pointer hover:bg-blue-50 transition-colors overflow-hidden">
+            <label id="image-dropzone" role="button" tabindex="0" aria-label="上传或拖放图片" class="relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-blue-300 rounded-2xl bg-white cursor-pointer hover:bg-blue-50 transition-colors overflow-hidden">
                 <div id="image-dropzone-prompt" class="absolute inset-0 flex flex-col items-center justify-center">
                     <i data-lucide="camera" class="w-10 h-10 text-blue-400"></i>
                     <p class="mt-3 text-base font-medium text-slate-600">拍照或上传产品照片</p>
-                    <p class="mt-1 text-sm text-slate-400">支持 JPG / PNG / WEBP · 点击选择或拖拽到此处</p>
+                    <p class="mt-1 text-sm text-slate-400">支持 JPG / PNG / WEBP · 点击拍照或从相册选择</p>
                 </div>
                 <img id="image-preview" src="" alt="查询图片预览" class="hidden w-full h-full object-contain p-2" draggable="false"/>
                 <div id="image-reupload-hint" class="hidden absolute bottom-0 inset-x-0 text-center text-xs text-white bg-black/50 py-1.5 pointer-events-none">点击上传或拖放图片到此处</div>
-                <input type="file" id="image-file-input" accept="image/*" class="hidden"/>
+                <input type="file" id="image-file-input" accept="image/*" class="absolute w-px h-px opacity-0 overflow-hidden" tabindex="-1"/>
             </label>
             <p id="image-search-status" class="mt-3 text-center text-sm text-slate-500"></p>
             <div class="mt-4 bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-xs text-slate-500 space-y-1.5 leading-relaxed">
-                <p class="font-semibold text-slate-600">📋 使用说明</p>
-                <p>1. 支持 JPG / PNG / WEBP，建议上传清晰的单个零件、展开的盒装照片或有辨识度的零件；</p>
+                <p class="font-semibold text-slate-600">使用说明</p>
+               <p>1. 支持 JPG / PNG / WEBP，建议上传清晰的单个零件、展开的盒装照片或有辨识度的零件；</p>
                 <p>2. 拍照时尽量让零件完整入镜、光线充足、背景干净（白色背景识别效果最佳）；</p>
                 <p>3. 系统通过 AI 视觉特征在编号图库中检索，结果按相似度从高到低排序；</p>
                 <p>4. 相似度较低时可能无法准确命中，可尝试更换角度、补充光线或裁剪后重试；</p>
@@ -520,7 +520,7 @@
                     els.resultsCount.classList.remove('hidden');
                     lucide.createIcons({ root: els.resultsCount });
                 } else if (!isLoadMore && data.images.length === 0) {
-                    showMessage('error', '未找到结果');
+                    showMessage('info', state.searchType === 'image' ? '未找到相似编号，建议更换角度、补充光线或裁剪后重试' : '未找到结果');
                 }
             } else {
                 showMessage('error', data.error || '未找到结果');
@@ -538,11 +538,12 @@
                 els.resultsCount.classList.add('hidden'); 
             }
 
-            if (state.isLoading) return;
+            if (state.isLoading && isLoadMore) return;
             state.isLoading = true;
 
             if (searchAbortController) searchAbortController.abort();
-            searchAbortController = new AbortController();
+            const controller = new AbortController();
+            searchAbortController = controller;
 
             if (!isLoadMore) {
                 renderSkeletonCards();
@@ -554,7 +555,7 @@
                 let url = `${CONFIG.API_WORKER_URL}/recent?limit=${CONFIG.PAGE_LIMIT}`;
                 if (isLoadMore && state.nextOffset) url += `&offset=${state.nextOffset}`;
                 
-                const data = await cachedFetchJSON(url, searchAbortController.signal);
+                const data = await cachedFetchJSON(url, controller.signal);
 
                 if (data.success) {
                     if (data.images.length > 0 || isLoadMore) {
@@ -566,7 +567,7 @@
             } catch (e) {
                 if (e.name !== 'AbortError') showMessage('error', '加载失败，请重试');
             } finally {
-                if (!searchAbortController.signal.aborted) state.isLoading = false;
+                if (!controller.signal.aborted) state.isLoading = false;
             }
         }
 
@@ -607,7 +608,7 @@
             els.suggestionsBox.classList.add('hidden');
             els.navSearchInput.value = els.searchInput.value;
             
-            if (state.isLoading) return;
+            if (state.isLoading && isLoadMore) return;
             const effectiveQuery = getEffectiveQuery();
             if (!effectiveQuery || (state.isPrefixEnabled && state.searchType === 'id' && effectiveQuery === CONFIG.DEFAULT_PREFIX)) {
                 if (!isLoadMore) loadRecentUpdates();
@@ -619,7 +620,8 @@
             els.recentTitle.classList.add('hidden');
 
             if (searchAbortController) searchAbortController.abort();
-            searchAbortController = new AbortController();
+            const controller = new AbortController();
+            searchAbortController = controller;
 
             if (!isLoadMore) {
                 state.nextCursor = null; 
@@ -637,13 +639,13 @@
                     else if (state.searchType === 'id' && state.nextCursor) url += `&cursor=${encodeURIComponent(state.nextCursor)}`;
                 }
 
-                const data = await cachedFetchJSON(url, searchAbortController.signal);
+                const data = await cachedFetchJSON(url, controller.signal);
                 handleSearchResults(data, isLoadMore);
 
             } catch (e) {
                 if (e.name !== 'AbortError') showMessage('error', '连接服务器失败');
             } finally {
-                if (!searchAbortController.signal.aborted) state.isLoading = false;
+                if (!controller.signal.aborted) state.isLoading = false;
             }
         }
         
@@ -876,22 +878,70 @@
             transformersModule.env.allowLocalModels = true;
             transformersModule.env.allowRemoteModels = false;
             transformersModule.env.backends.onnx.wasm.wasmPaths = modelBase;
-            clipProcessor = await transformersModule.AutoProcessor.from_pretrained('mobileclip_s0');
-            clipModel = await transformersModule.CLIPVisionModelWithProjection.from_pretrained('mobileclip_s0', { quantized: false, dtype: 'fp32' });
+            const onProgress = (p) => {
+                if (!p || p.status !== 'progress' || !p.file) return;
+                const pct = typeof p.progress === 'number' ? Math.round(p.progress * 100) : 0;
+                status.textContent = `⏳ 正在加载 AI 模型 ${p.file} ${pct}%...`;
+            };
+            clipProcessor = await transformersModule.AutoProcessor.from_pretrained('mobileclip_s0', { progress_callback: onProgress });
+            clipModel = await transformersModule.CLIPVisionModelWithProjection.from_pretrained('mobileclip_s0', { quantized: false, dtype: 'fp32', progress_callback: onProgress });
+        }
+
+        // 统一图片解码：优先 createImageBitmap，iOS/WebView 不支持时回退到 <img> 解码
+        async function decodeSource(file) {
+            try {
+                if (typeof createImageBitmap === 'function') {
+                    const bm = await createImageBitmap(file);
+                    if (bm && bm.width) {
+                        return {
+                            width: bm.width,
+                            height: bm.height,
+                            draw(ctx, dx, dy, dw, dh) { ctx.drawImage(bm, 0, 0, bm.width, bm.height, dx, dy, dw, dh); },
+                            close() { if (typeof bm.close === 'function') bm.close(); }
+                        };
+                    }
+                }
+            } catch (e) { /* 继续走 <img> 兜底 */ }
+
+            const url = URL.createObjectURL(file);
+            try {
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = () => reject(new Error('图片解码失败'));
+                    img.src = url;
+                });
+                const iw = img.naturalWidth || img.width;
+                const ih = img.naturalHeight || img.height;
+                if (!iw || !ih) throw new Error('图片解码失败');
+                return {
+                    width: iw,
+                    height: ih,
+                    draw(ctx, dx, dy, dw, dh) { ctx.drawImage(img, 0, 0, iw, ih, dx, dy, dw, dh); },
+                    close() { URL.revokeObjectURL(url); }
+                };
+            } catch (e) {
+                URL.revokeObjectURL(url);
+                throw e;
+            }
         }
 
         async function computeImageVector(file) {
             await loadClipModel();
-            const bitmap = await createImageBitmap(file);
-            const size = Math.max(bitmap.width, bitmap.height);
+            const src = await decodeSource(file);
+            const maxSide = 640;
+            const scale = Math.min(1, maxSide / Math.max(src.width, src.height));
+            const w = Math.max(1, Math.round(src.width * scale));
+            const h = Math.max(1, Math.round(src.height * scale));
+            const size = Math.max(w, h);
             const canvas = document.createElement('canvas');
             canvas.width = size; canvas.height = size;
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, size, size);
-            ctx.drawImage(bitmap, (size - bitmap.width) / 2, (size - bitmap.height) / 2);
-            const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-            const raw = await transformersModule.RawImage.fromBlob(blob);
+            src.draw(ctx, (size - w) / 2, (size - h) / 2, w, h);
+            src.close();
+            const raw = transformersModule.RawImage.fromCanvas(canvas);
             const inputs = await clipProcessor(raw);
             const { image_embeds } = await clipModel(inputs);
             const arr = image_embeds && image_embeds.data
@@ -910,37 +960,66 @@
                 status.textContent = '⏳ 正在处理上一张图片，请稍候...';
                 return;
             }
+            if (!file || !file.type || !file.type.startsWith('image/')) {
+                status.textContent = '❌ 仅支持 JPG / PNG / WEBP 图片文件';
+                return;
+            }
+            // iPhone 相册里的 HEIC 格式浏览器无法解码，提前友好提示
+            const lowerName = (file.name || '').toLowerCase();
+            if (file.type === 'image/heic' || file.type === 'image/heif' || lowerName.endsWith('.heic') || lowerName.endsWith('.heif')) {
+                status.textContent = '❌ 检测到 HEIC 格式（iPhone 相册照片），请改用相机直接拍摄，或先转成 JPG 再上传';
+                return;
+            }
+            if (file.size > 20 * 1024 * 1024) {
+                status.textContent = '❌ 图片超过 20MB，请压缩后再试';
+                return;
+            }
             imageSearchBusy = true;
 
+            // 释放上一张预览图的临时 URL，避免内存堆积
+            if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);
             // 预览图显示在框内
             preview.src = URL.createObjectURL(file);
             preview.classList.remove('hidden');
             prompt.classList.add('hidden');
             reuploadHint.classList.remove('hidden');
             imageDropzone.classList.remove('bg-blue-50');
+            // 搜索期间先展示骨架屏，避免页面看起来像卡住
+            renderSkeletonCards(4);
             status.textContent = '⏳ 正在计算图片特征...';
+            const searchController = new AbortController();
+            let searchTimer = null;
             try {
                 if (!clipModel) {
                     status.textContent = '⏳ 首次使用正在加载 AI 模型（约 66MB），加载完成后自动搜索...';
                 }
                 const vector = await computeImageVector(file);
                 status.textContent = '⏳ 正在检索相似编号...';
+                // 超时只覆盖检索请求，模型下载/特征计算不计入
+                searchTimer = setTimeout(() => searchController.abort(), 30000);
                 const res = await fetch(`${CONFIG.API_WORKER_URL}/api/image-search`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ vector })
+                    body: JSON.stringify({ vector }),
+                    signal: searchController.signal
                 });
                 const data = await res.json();
                 if (data.success) {
                     state.currentView = 'search';
                     els.recentTitle.classList.add('hidden');
                     handleSearchResults(data, false);
-                    status.textContent = '✅ 检索完成（' + ((data.images || []).length) + ' 条结果，按相似度排序）';
+                    status.textContent = (data.images || []).length > 0
+                        ? '✅ 检索完成（' + data.images.length + ' 条结果，按相似度排序）'
+                        : '🔍 未找到相似编号，建议换角度、补光或裁剪后重试';
                     els.gallery.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 } else {
                     status.textContent = '❌ 检索失败: ' + (data.error || '未知错误');
                 }
             } catch (e) {
+                if (e && e.name === 'AbortError') {
+                    status.textContent = '❌ 检索超时（30 秒），请检查网络后重试';
+                    return;
+                }
                 const msg = (e && e.message) || String(e);
                 if (/fetch|network|load|onnx|wasm|failed/i.test(msg)) {
                     status.textContent = '❌ AI 模型/网络加载失败，请检查网络后刷新页面重试';
@@ -951,13 +1030,19 @@
                 }
                 console.error(e);
             } finally {
+                clearTimeout(searchTimer);
                 imageSearchBusy = false;
             }
         }
 
         const imageDropzone = document.getElementById('image-dropzone');
         const imageFileInput = document.getElementById('image-file-input');
-        imageDropzone.addEventListener('click', () => imageFileInput.click());
+        // 不再手动 click：label 原生行为在手机端（含 iOS）最稳定，且不会重复弹窗
+        imageDropzone.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            imageFileInput.click();
+        });
         imageFileInput.addEventListener('change', (e) => {
             const f = e.target.files[0];
             if (f) performImageSearch(f);
