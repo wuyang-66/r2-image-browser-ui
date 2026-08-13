@@ -140,12 +140,12 @@
             </label>
             <p id="image-search-status" class="mt-3 text-center text-sm text-slate-500"></p>
             <div class="mt-4 bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-xs text-slate-500 space-y-1.5 leading-relaxed">
-                <p class="font-semibold text-slate-600">使用说明（为保障识别准确请仔细阅读）！</p>
-                <p>1. 支持 JPG / PNG / WEBP，建议上传清晰的零件特写或盒装照片；</p>
+                <p class="font-semibold text-slate-600">📋 使用说明</p>
+                <p>1. 支持 JPG / PNG / WEBP，建议上传清晰的零件特写或产品照片；</p>
                 <p>2. 拍照时尽量让零件完整入镜、光线充足、背景干净（白色背景识别效果最佳）；</p>
                 <p>3. 系统通过 AI 视觉特征在编号图库中检索，结果按相似度从高到低排序；</p>
                 <p>4. 相似度较低时可能无法准确命中，可尝试更换角度、补充光线或裁剪后重试；</p>
-                <p>5. 图片由本地服务器计算特征（工作时间段）；非工作时间段自动切换浏览器计算（首次需下载模型（45MB），仅一次）。</p>
+                <p>5. 图片由本地服务器计算特征（更快更准）；若本地服务未开启，自动切换浏览器计算（首次需下载约 45MB 模型，仅一次）；上传图片仅用于匹配，不会对外公开。</p>
             </div>
         </div>
 
@@ -445,10 +445,10 @@
             els.galleryMsg.innerHTML = ''; 
             
             const fragment = document.createDocumentFragment();
-            images.forEach((img) => {
+            images.forEach((img, idx) => {
                 const versionQuery = img.uploaded ? `?v=${img.uploaded}` : '';
                 const originalUrl = `${CONFIG.R2_BUCKET_URL}/${img.key}${versionQuery}`;
-                const thumb = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=400,height=400,fit=cover,format=auto,quality=75/${originalUrl}`;
+                const thumb = `${CONFIG.R2_BUCKET_URL}/cdn-cgi/image/width=400,height=400,fit=cover,format=auto,quality=75/${originalUrl}`;
 
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 relative';
@@ -458,6 +458,7 @@
 
                 card.dataset.original = originalUrl;
                 card.dataset.key = img.key; 
+                card.dataset.uploaded = img.uploaded || '';
                 card.dataset.displayName = escapeHTML(img.displayName);
                 card.dataset.productName = escapeHTML(img.productName);
                 card.dataset.description = escapeHTML(img.description || '正在完善中....');
@@ -472,7 +473,7 @@
                     <div class="relative aspect-square bg-slate-100 overflow-hidden">
                         ${newBadge}
                         <div class="absolute inset-0 img-skeleton"></div>
-                        <img src="${thumb}" loading="lazy" decoding="async"
+                        <img src="${thumb}" ${!append && idx < 8 ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"'} decoding="async"
                              class="absolute inset-0 w-full h-full object-cover opacity-0 transition-opacity duration-300 pointer-events-none"
                              onload="this.style.opacity='1'; this.previousElementSibling.remove();" onerror="this.previousElementSibling.remove(); this.style.display='none';">
                         <div class="hover-overlay absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none"><p class="text-white font-bold text-lg">查看详情</p></div>
@@ -785,7 +786,7 @@
             if (!card) return;
             
             const originalUrl = card.dataset.original;
-            const modalOptimizedUrl = `${CONFIG.API_WORKER_URL}/cdn-cgi/image/width=1200,fit=scale-down,format=auto,quality=85/${originalUrl}`;
+            const modalOptimizedUrl = `${CONFIG.R2_BUCKET_URL}/cdn-cgi/image/width=1200,fit=scale-down,format=auto,quality=85/${originalUrl}`;
             
             els.modalImg.classList.add('opacity-0');
             document.getElementById('modal-img-loader').classList.remove('hidden');
