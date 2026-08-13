@@ -37,6 +37,7 @@
       <stop offset="1" stop-color="#06499d"/>
     </linearGradient>
   </defs>
+  <rect width="512" height="512" fill="#ffffff"/>
   <polygon class="st4" points="66.57 379.35 149.06 379.35 392.79 108.63 66.57 379.35"/>
   <polygon class="st1" points="161.47 379.35 242.65 379.35 406.43 108.63 161.47 379.35"/>
   <polygon class="st0" points="264.76 379.35 445.43 379.35 326.49 266.44 264.76 379.35"/>
