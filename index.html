@@ -68,13 +68,14 @@
             border: 2px solid #ffffff;
             background: rgba(37, 99, 235, 0.85);
             border-radius: 3px;
-            cursor: nwse-resize;
             box-sizing: border-box;
+            touch-action: none;
         }
-        .crop-handle[data-dir="nw"] { top: -9px; left: -9px; }
-        .crop-handle[data-dir="ne"] { top: -9px; right: -9px; }
-        .crop-handle[data-dir="sw"] { bottom: -9px; left: -9px; }
-        .crop-handle[data-dir="se"] { bottom: -9px; right: -9px; }
+        /* 对角手柄按方向区分光标：nw/se 沿 ↘ 对角线，ne/sw 沿 ↙ 对角线 */
+        .crop-handle[data-dir="nw"] { top: -9px; left: -9px; cursor: nwse-resize; }
+        .crop-handle[data-dir="se"] { bottom: -9px; right: -9px; cursor: nwse-resize; }
+        .crop-handle[data-dir="ne"] { top: -9px; right: -9px; cursor: nesw-resize; }
+        .crop-handle[data-dir="sw"] { bottom: -9px; left: -9px; cursor: nesw-resize; }
 
         #nav-mini-search { opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
         #nav-mini-search.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
@@ -410,6 +411,7 @@
         }
 
         let toastTimer = null;
+        let lastFocusedEl = null; // 模态框焦点管理：打开前记录、关闭后还原
         function showToast(message) {
             els.toast.textContent = message;
             els.toast.classList.add('visible');
@@ -571,7 +573,8 @@
                 els.navSearchInput.value = '';
                 els.clearBtn.classList.add('hidden');
                 els.recentTitle.classList.remove('hidden');
-                els.resultsCount.classList.add('hidden'); 
+                els.resultsCount.classList.add('hidden');
+                document.title = '迅驰工具在线查询';
             }
 
             if (state.isLoading && isLoadMore) return;
@@ -654,10 +657,13 @@
             state.isLoading = true;
             state.currentView = 'search';
             els.recentTitle.classList.add('hidden');
+            const searchTypeAtStart = state.searchType;
 
             if (searchAbortController) searchAbortController.abort();
             const controller = new AbortController();
             searchAbortController = controller;
+            let timedOut = false;
+            const timeoutTimer = setTimeout(() => { timedOut = true; controller.abort(); }, 30000);
 
             if (!isLoadMore) {
                 state.nextCursor = null; 
@@ -676,12 +682,19 @@
                 }
 
                 const data = await cachedFetchJSON(url, controller.signal);
+                if (state.searchType !== searchTypeAtStart) return; // 请求期间用户切换了搜索模式，丢弃过期结果
                 handleSearchResults(data, isLoadMore);
-
+                if (!isLoadMore) document.title = '搜索：' + effectiveQuery + ' - 迅驰工具在线查询';
             } catch (e) {
-                if (e.name !== 'AbortError') showMessage('error', '连接服务器失败');
+                if (e.name === 'AbortError') {
+                    if (timedOut) showMessage('error', '请求超时，请重试');
+                } else {
+                    showMessage('error', '连接服务器失败');
+                }
             } finally {
-                if (!controller.signal.aborted) state.isLoading = false;
+                clearTimeout(timeoutTimer);
+                // 切换/清空导致的取消由新流程接管；超时需恢复 isLoading
+                if (!controller.signal.aborted || timedOut) state.isLoading = false;
             }
         }
         
@@ -742,6 +755,8 @@
                 document.getElementById('search-row').style.display = isImage ? 'none' : '';
                 document.getElementById('image-search-area').classList.toggle('hidden', !isImage);
                 if (isImage) {
+                    // 进入图片模式：彻底重置图片搜索区状态（清理残留裁剪框/预览/进行中的请求）
+                    resetImageSearchUI('请上传一张照片开始搜索');
                     els.hotSearchesContainer.classList.add('hidden');
                     els.historyContainer.classList.add('hidden');
                     els.suggestionsBox.classList.add('hidden');
@@ -752,9 +767,9 @@
                     els.resultsCount.classList.add('hidden');
                     els.loadMoreContainer.classList.add('hidden');
                     state.hasMore = false;
-                    const st = document.getElementById('image-search-status');
-                    if (!document.getElementById('image-preview').src) st.textContent = '请上传一张照片开始搜索';
                 } else {
+                    // 切出图片模式：清理图片搜索状态，避免残留
+                    resetImageSearchUI();
                     if (els.hotSearchesList.children.length > 0) els.hotSearchesContainer.classList.remove('hidden');
                     renderHistory();
                     // 仅从图片模式切回时，恢复首页最近更新
@@ -844,6 +859,10 @@
             
             els.modal.classList.remove('hidden');
             document.body.classList.add('no-scroll');
+            lastFocusedEl = document.activeElement;
+            document.title = card.dataset.displayName + ' - 迅驰工具在线查询';
+            const closeBtn = document.getElementById('modal-close-btn');
+            if (closeBtn && typeof closeBtn.focus === 'function') closeBtn.focus();
         });
 
         // --- 🤖 AI 触发解析交互 ---
@@ -868,7 +887,13 @@
 
         els.modalImg.onload = () => { els.modalImg.classList.remove('opacity-0'); document.getElementById('modal-img-loader').classList.add('hidden'); };
 
-        const closeModal = () => { els.modal.classList.add('hidden'); document.body.classList.remove('no-scroll'); };
+        const closeModal = () => {
+            els.modal.classList.add('hidden');
+            document.body.classList.remove('no-scroll');
+            if (lastFocusedEl && typeof lastFocusedEl.focus === 'function') {
+                try { lastFocusedEl.focus(); } catch (e) {}
+            }
+        };
         document.getElementById('modal-overlay').addEventListener('click', closeModal);
         document.getElementById('modal-close-btn').addEventListener('click', closeModal);
         
@@ -973,20 +998,75 @@
             }
         }
 
-        async function computeImageVector(file) {
-            await loadClipModel();
-            const src = await decodeSource(file);
-            const maxSide = 640;
-            const scale = Math.min(1, maxSide / Math.max(src.width, src.height));
-            const w = Math.max(1, Math.round(src.width * scale));
-            const h = Math.max(1, Math.round(src.height * scale));
-            const size = Math.max(w, h);
+        // 白底方形画布：输入区域宽高 → 最长边 maxSide、JPEG 同款预处理（与本地推理服务输入一致）
+        function createWhiteCanvasFor(w, h, maxSide) {
+            const scale = Math.min(1, maxSide / Math.max(w, h));
+            const dw = Math.max(1, Math.round(w * scale));
+            const dh = Math.max(1, Math.round(h * scale));
+            const size = Math.max(dw, dh);
             const canvas = document.createElement('canvas');
             canvas.width = size; canvas.height = size;
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, size, size);
-            src.draw(ctx, (size - w) / 2, (size - h) / 2, w, h);
+            return { canvas, ctx, dw, dh };
+        }
+
+        // 统一"已转正"的图片源：优先 createImageBitmap（自动应用 EXIF 方向），
+        // 极老环境回退 <img>。返回 { width, height, draw(ctx,sx,sy,sw,sh,dx,dy,dw,dh), close() }
+        async function loadOrientedBitmap(file) {
+            try {
+                if (typeof createImageBitmap === 'function') {
+                    const bm = await createImageBitmap(file);
+                    if (bm && bm.width) {
+                        return {
+                            width: bm.width,
+                            height: bm.height,
+                            draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh) { ctx.drawImage(bm, sx, sy, sw, sh, dx, dy, dw, dh); },
+                            close() { if (typeof bm.close === 'function') bm.close(); }
+                        };
+                    }
+                }
+            } catch (e) { /* 回退 <img> 解码 */ }
+
+            const url = URL.createObjectURL(file);
+            try {
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = () => reject(new Error('图片解码失败'));
+                    img.src = url;
+                });
+                const iw = img.naturalWidth || img.width;
+                const ih = img.naturalHeight || img.height;
+                if (!iw || !ih) throw new Error('图片解码失败');
+                return {
+                    width: iw,
+                    height: ih,
+                    draw(ctx, sx, sy, sw, sh, dx, dy, dw, dh) { ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh); },
+                    close() { URL.revokeObjectURL(url); }
+                };
+            } catch (e) {
+                URL.revokeObjectURL(url);
+                throw e;
+            }
+        }
+
+        // Blob → dataURL（cropAndCompress 双产出用）
+        function blobToDataURL(blob) {
+            return new Promise((resolve, reject) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result);
+                fr.onerror = () => reject(new Error('图片编码失败'));
+                fr.readAsDataURL(blob);
+            });
+        }
+
+        async function computeImageVector(file) {
+            await loadClipModel();
+            const src = await decodeSource(file);
+            const { canvas, ctx, dw, dh } = createWhiteCanvasFor(src.width, src.height, 640);
+            src.draw(ctx, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
             src.close();
             const raw = transformersModule.RawImage.fromCanvas(canvas);
             const inputs = await clipProcessor(raw);
@@ -1001,17 +1081,8 @@
         // 上传图片前压缩：白底居中 + 最长边 640 + JPEG（与本地推理服务输入一致）
         async function compressImageToBase64(file) {
             const src = await decodeSource(file);
-            const maxSide = 640;
-            const scale = Math.min(1, maxSide / Math.max(src.width, src.height));
-            const w = Math.max(1, Math.round(src.width * scale));
-            const h = Math.max(1, Math.round(src.height * scale));
-            const size = Math.max(w, h);
-            const canvas = document.createElement('canvas');
-            canvas.width = size; canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, size, size);
-            src.draw(ctx, (size - w) / 2, (size - h) / 2, w, h);
+            const { canvas, ctx, dw, dh } = createWhiteCanvasFor(src.width, src.height, 640);
+            src.draw(ctx, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
             src.close();
             return canvas.toDataURL('image/jpeg', 0.85);
         }
@@ -1019,14 +1090,15 @@
         let cropFile = null;
         let cropState = null;
         let cropDrag = null;
+        let cropBitmap = null; // 已转正（EXIF 已应用）的图片源，预览/裁剪/搜索共用同一坐标系
 
         function getImageDisplayRect() {
             const drop = document.getElementById('image-dropzone');
             const img = document.getElementById('image-preview');
-            if (!drop || !img || !img.naturalWidth || !img.naturalHeight) return null;
+            if (!drop || !img || !cropBitmap) return null;
             const cw = drop.clientWidth;
             const ch = drop.clientHeight;
-            const iw = img.naturalWidth, ih = img.naturalHeight;
+            const iw = cropBitmap.width, ih = cropBitmap.height;
             const scale = Math.min(cw / iw, ch / ih);
             const dw = iw * scale, dh = ih * scale;
             return { left: (cw - dw) / 2, top: (ch - dh) / 2, width: dw, height: dh };
@@ -1060,60 +1132,61 @@
             cropState = null;
         }
 
-        async function cropAndCompress(file, sx, sy, sw, sh) {
-            const url = URL.createObjectURL(file);
-            const img = await new Promise((resolve, reject) => {
-                const im = new Image();
-                im.onload = () => resolve(im);
-                im.onerror = () => reject(new Error('图片解码失败'));
-                im.src = url;
-            });
-            const maxSide = 640;
-            const scale = Math.min(1, maxSide / Math.max(sw, sh));
-            const w = Math.max(1, Math.round(sw * scale));
-            const h = Math.max(1, Math.round(sh * scale));
-            const size = Math.max(w, h);
-            const canvas = document.createElement('canvas');
-            canvas.width = size; canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, size, size);
-            ctx.drawImage(img, sx, sy, sw, sh, (size - w) / 2, (size - h) / 2, w, h);
-            URL.revokeObjectURL(url);
-            return canvas.toDataURL('image/jpeg', 0.85);
+        // 按裁剪框裁出主体：白底方形 + 最长边 640 + JPEG，
+        // 产出 base64（主模式）、blob（浏览器回退模式）、previewUrl（回显到预览框）
+        async function cropAndCompress(sx, sy, sw, sh) {
+            if (!cropBitmap) throw new Error('图片未就绪');
+            const { canvas, ctx, dw, dh } = createWhiteCanvasFor(sw, sh, 640);
+            cropBitmap.draw(ctx, sx, sy, sw, sh, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
+            const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+            if (!blob) throw new Error('图片编码失败');
+            const dataURL = await blobToDataURL(blob);
+            const previewUrl = URL.createObjectURL(blob);
+            return { dataURL, blob, previewUrl };
         }
 
-        async function runImageSearch(imageData) {
+        // imageData: 已压缩的 base64（主模式，发 Worker 由本地推理服务算向量）
+        // fallbackFile: 裁剪后的 Blob（本地服务不可用时，浏览器模式基于同一张裁剪图算向量）
+        async function runImageSearch(imageData, fallbackFile) {
             const status = document.getElementById('image-search-status');
             // 进入搜索后恢复底部提示（完成后可点击更换图片）
             document.getElementById('image-reupload-hint').classList.remove('hidden');
             renderSkeletonCards(4);
             status.textContent = '⏳ 正在上传图片并检索相似编号...';
-            const searchController = new AbortController();
+            // 挂到全局 AbortController：用户切换模式时自动中断，避免结果覆盖错乱
+            if (searchAbortController) searchAbortController.abort();
+            const controller = new AbortController();
+            searchAbortController = controller;
             let searchTimer = null;
+            let deadline = 45000; // 主模式（上传+本地服务）时限
             try {
-                searchTimer = setTimeout(() => searchController.abort(), 45000);
+                searchTimer = setTimeout(() => { if (state.searchType === 'image') controller.abort(); }, deadline);
                 let res = await fetch(`${CONFIG.API_WORKER_URL}/api/image-search`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ image: imageData }),
-                    signal: searchController.signal
+                    signal: controller.signal
                 });
                 let data = await res.json().catch(() => ({}));
                 // 本地推理服务不可用（下班关机/隧道断线）→ 自动切换浏览器计算模式
                 if (!data.success && (data.code === 'EMBED_OFFLINE' || data.code === 'EMBED_NOT_CONFIGURED')) {
+                    if (!fallbackFile) throw new Error('缺少可用的图片数据');
                     status.textContent = 'ℹ️ 本地推理服务暂不可用，已切换浏览器计算模式（首次需下载约 45MB 模型）...';
-                    const vector = await computeImageVector(cropFile);
+                    const vector = await computeImageVector(fallbackFile);
+                    if (state.searchType !== 'image') return; // 计算期间用户已切走，丢弃结果
                     status.textContent = '⏳ 正在检索相似编号...';
-                    searchTimer = setTimeout(() => searchController.abort(), 30000);
+                    deadline = 30000; // 浏览器模式：向量已在本地算好，检索时限更短
+                    clearTimeout(searchTimer);
+                    searchTimer = setTimeout(() => { if (state.searchType === 'image') controller.abort(); }, deadline);
                     res = await fetch(`${CONFIG.API_WORKER_URL}/api/image-search`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ vector }),
-                        signal: searchController.signal
+                        signal: controller.signal
                     });
                     data = await res.json().catch(() => ({}));
                 }
+                if (state.searchType !== 'image') return; // 用户已切换模式，丢弃结果
                 if (data.success) {
                     state.currentView = 'search';
                     els.recentTitle.classList.add('hidden');
@@ -1127,10 +1200,11 @@
                 }
             } catch (e) {
                 if (e && e.name === 'AbortError') {
-                    status.textContent = '❌ 检索超时（30 秒），请检查网络后重试';
+                    if (state.searchType === 'image') status.textContent = '❌ 检索超时（' + (deadline / 1000) + ' 秒），请检查网络后重试';
                     return;
                 }
                 const msg = (e && e.message) || String(e);
+                if (state.searchType !== 'image') return;
                 if (/fetch|network|load|onnx|wasm|failed/i.test(msg)) {
                     status.textContent = '❌ AI 模型/网络加载失败，已自动重试仍失败。建议：连接 Wi-Fi 后重试，或改用 Chrome/夸克浏览器，或清理浏览器缓存';
                 } else if (/image|decode|bitmap|parse|canvas/i.test(msg)) {
@@ -1164,6 +1238,11 @@
                 status.textContent = '❌ 检测到 HEIC 格式（iPhone 相册照片），请改用相机直接拍摄，或先转成 JPG 再上传';
                 return;
             }
+            // 扩展名/类型双重校验，与实际支持格式（JPG/PNG/WEBP）一致
+            if (!/^image\/(jpe?g|png|webp)$/i.test(file.type) && !/\.(jpe?g|png|webp)$/i.test(lowerName)) {
+                status.textContent = '❌ 仅支持 JPG / PNG / WEBP 图片文件';
+                return;
+            }
             if (file.size > 20 * 1024 * 1024) {
                 status.textContent = '❌ 图片超过 20MB，请压缩后再试';
                 return;
@@ -1175,22 +1254,46 @@
             prompt.classList.add('hidden');
             reuploadHint.classList.remove('hidden');
             imageDropzone.classList.remove('bg-blue-50');
-            status.textContent = '📐 请拖拽框选主体，点「确定」搜索；点「取消」退出重新选图';
-            // 等预览图加载完成后再显示裁剪框（此时 naturalWidth 才可用）
-            preview.onload = () => showCropUI(file);
+            status.textContent = '📐 正在准备图片，请稍候...';
+            try {
+                // 统一转正坐标系：预览/裁剪/搜索都基于同一份已应用 EXIF 方向的图片
+                cropBitmap = await loadOrientedBitmap(file);
+                status.textContent = '📐 请拖拽框选主体，点「确定」搜索；点「取消」退出重新选图';
+                // 等预览图加载完成后再显示裁剪框（此时布局尺寸才可用）
+                if (preview.complete && preview.naturalWidth) {
+                    showCropUI(file);
+                } else {
+                    preview.onload = () => showCropUI(file);
+                }
+            } catch (e) {
+                console.error('图片准备失败:', e);
+                resetImageSearchUI('❌ 图片无法识别，请换一张 JPG / PNG 图片');
+            }
         }
 
         function doCropSearch() {
-            if (!cropFile || !cropState) return;
+            if (!cropFile || !cropState || !cropBitmap) return;
             const disp = getImageDisplayRect();
-            const img = document.getElementById('image-preview');
-            if (!disp || !img) return;
-            const sx = (cropState.x - disp.left) / disp.width * img.naturalWidth;
-            const sy = (cropState.y - disp.top) / disp.height * img.naturalHeight;
-            const sw = cropState.w / disp.width * img.naturalWidth;
-            const sh = cropState.h / disp.height * img.naturalHeight;
-            cropAndCompress(cropFile, sx, sy, sw, sh)
-                .then(imageData => runImageSearch(imageData))
+            if (!disp) return;
+            const iw = cropBitmap.width, ih = cropBitmap.height;
+            const sx = (cropState.x - disp.left) / disp.width * iw;
+            const sy = (cropState.y - disp.top) / disp.height * ih;
+            const sw = cropState.w / disp.width * iw;
+            const sh = cropState.h / disp.height * ih;
+            if (sw < 2 || sh < 2) {
+                document.getElementById('image-search-status').textContent = '❌ 选取范围过小，请重新框选';
+                return;
+            }
+            // 先隐藏裁剪框，避免搜索期间残留
+            hideCropUI();
+            cropAndCompress(sx, sy, sw, sh)
+                .then(({ dataURL, blob, previewUrl }) => {
+                    // 用裁切结果替换预览图：让用户看到实际参与检索的主体
+                    const preview = document.getElementById('image-preview');
+                    if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);
+                    preview.src = previewUrl;
+                    runImageSearch(dataURL, blob);
+                })
                 .catch(e => {
                     imageSearchBusy = false;
                     document.getElementById('image-search-status').textContent = '❌ 图片裁切失败: ' + ((e && e.message) || e);
@@ -1198,34 +1301,37 @@
                 });
         }
 
-        function doCancelCrop() {
-            // 退出框选：清掉预览，恢复上传初始状态，允许重新选图
-            const status = document.getElementById('image-search-status');
+        // 统一重置图片搜索区：中断请求、清预览/裁剪/状态，恢复上传初始界面
+        function resetImageSearchUI(statusText) {
+            if (searchAbortController) searchAbortController.abort();
+            hideCropUI();
             const preview = document.getElementById('image-preview');
             const prompt = document.getElementById('image-dropzone-prompt');
-            hideCropUI();
-            preview.onload = null;  // 清除残留回调，避免取消后误触发框选
+            preview.onload = null; // 清除残留回调，避免取消后误触发框选
             if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);
             preview.src = '';
             preview.classList.add('hidden');
             prompt.classList.remove('hidden');
+            document.getElementById('image-reupload-hint').classList.add('hidden');
             imageDropzone.classList.remove('bg-blue-50');
+            if (cropBitmap && typeof cropBitmap.close === 'function') {
+                try { cropBitmap.close(); } catch (e) {}
+            }
+            cropBitmap = null;
             imageSearchBusy = false;
-            status.textContent = '已取消，可重新上传图片';
+            if (statusText !== undefined) document.getElementById('image-search-status').textContent = statusText;
         }
 
-        // 框选拖拽（支持鼠标和触摸）
-        const cropBox = document.getElementById('crop-box');
-        cropBox.addEventListener('pointerdown', (e) => {
-            e.preventDefault();
-            cropBox.setPointerCapture(e.pointerId);
-            const handle = e.target.closest('.crop-handle');
-            cropDrag = { mode: handle ? handle.dataset.dir : 'move', startX: e.clientX, startY: e.clientY, r: { ...cropState } };
-        });
-        cropBox.addEventListener('pointermove', (e) => {
+        function doCancelCrop() {
+            // 退出框选：清掉预览，恢复上传初始状态，允许重新选图
+            resetImageSearchUI('已取消，可重新上传图片');
+        }
+
+        // ---- 框选拖拽（支持鼠标和触摸） ----
+        function updateCropDrag(clientX, clientY) {
             if (!cropDrag || !cropState) return;
-            const dx = e.clientX - cropDrag.startX;
-            const dy = e.clientY - cropDrag.startY;
+            const dx = clientX - cropDrag.startX;
+            const dy = clientY - cropDrag.startY;
             const r = cropDrag.r;
             const disp = getImageDisplayRect();
             if (!disp) return;
@@ -1249,10 +1355,41 @@
             }
             cropState = { x: nx, y: ny, w: nw, h: nh };
             renderCropBox();
-        });
+        }
+
+        function startCropDrag(e, clientX, clientY) {
+            e.preventDefault();
+            const handle = e.target.closest('.crop-handle');
+            cropDrag = { mode: handle ? handle.dataset.dir : 'move', startX: clientX, startY: clientY, r: { ...cropState } };
+        }
         const endCropDrag = () => { cropDrag = null; };
-        cropBox.addEventListener('pointerup', endCropDrag);
-        cropBox.addEventListener('pointercancel', endCropDrag);
+
+        const cropBox = document.getElementById('crop-box');
+        if (window.PointerEvent) {
+            // 现代浏览器（含 iOS 13+）：Pointer 事件统一处理鼠标/触摸
+            cropBox.addEventListener('pointerdown', (e) => {
+                if (typeof cropBox.setPointerCapture === 'function') {
+                    try { cropBox.setPointerCapture(e.pointerId); } catch (err) {}
+                }
+                startCropDrag(e, e.clientX, e.clientY);
+            });
+            cropBox.addEventListener('pointermove', (e) => { if (cropDrag) updateCropDrag(e.clientX, e.clientY); });
+            cropBox.addEventListener('pointerup', endCropDrag);
+            cropBox.addEventListener('pointercancel', endCropDrag);
+        } else {
+            // 极老环境（无 PointerEvent）：touch + mouse 双轨兜底
+            cropBox.addEventListener('touchstart', (e) => {
+                if (e.touches[0]) startCropDrag(e, e.touches[0].clientX, e.touches[0].clientY);
+            }, { passive: false });
+            cropBox.addEventListener('touchmove', (e) => {
+                if (cropDrag && e.touches[0]) { e.preventDefault(); updateCropDrag(e.touches[0].clientX, e.touches[0].clientY); }
+            }, { passive: false });
+            cropBox.addEventListener('touchend', endCropDrag);
+            cropBox.addEventListener('touchcancel', endCropDrag);
+            cropBox.addEventListener('mousedown', (e) => { if (e.button === 0) startCropDrag(e, e.clientX, e.clientY); });
+            window.addEventListener('mousemove', (e) => { if (cropDrag) updateCropDrag(e.clientX, e.clientY); });
+            window.addEventListener('mouseup', endCropDrag);
+        }
         // 阻止拖拽后的 click 冒泡到 label（否则松开鼠标会再次弹出文件选择框）
         cropBox.addEventListener('click', (e) => {
             e.preventDefault();
