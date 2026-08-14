@@ -54,6 +54,28 @@
             .hover-overlay { display: none; }
         }
 
+        #crop-box {
+            position: absolute;
+            border: 2px solid #ffffff;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+            cursor: move;
+            touch-action: none;
+            box-sizing: border-box;
+        }
+        .crop-handle {
+            position: absolute;
+            width: 16px; height: 16px;
+            border: 2px solid #ffffff;
+            background: rgba(37, 99, 235, 0.85);
+            border-radius: 3px;
+            cursor: nwse-resize;
+            box-sizing: border-box;
+        }
+        .crop-handle[data-dir="nw"] { top: -9px; left: -9px; }
+        .crop-handle[data-dir="ne"] { top: -9px; right: -9px; }
+        .crop-handle[data-dir="sw"] { bottom: -9px; left: -9px; }
+        .crop-handle[data-dir="se"] { bottom: -9px; right: -9px; }
+
         #nav-mini-search { opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
         #nav-mini-search.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
@@ -134,11 +156,23 @@
                     <p class="mt-3 text-base font-medium text-slate-600">拍照或上传产品照片</p>
                     <p class="mt-1 text-sm text-slate-400">支持 JPG / PNG / WEBP · 点击拍照或从相册选择</p>
                 </div>
-                <img id="image-preview" src="" alt="查询图片预览" class="hidden w-full h-full object-contain p-2" draggable="false"/>
+                <img id="image-preview" src="" alt="查询图片预览" class="hidden w-full h-full object-contain" draggable="false"/>
+                <div id="crop-overlay" class="hidden absolute inset-0 z-20">
+                    <div id="crop-box">
+                        <div class="crop-handle" data-dir="nw"></div>
+                        <div class="crop-handle" data-dir="ne"></div>
+                        <div class="crop-handle" data-dir="sw"></div>
+                        <div class="crop-handle" data-dir="se"></div>
+                    </div>
+                </div>
                 <div id="image-reupload-hint" class="hidden absolute bottom-0 inset-x-0 text-center text-xs text-white bg-black/50 py-1.5 pointer-events-none">点击上传或拖放图片到此处</div>
                 <input type="file" id="image-file-input" accept="image/*" class="absolute w-px h-px opacity-0 overflow-hidden" tabindex="-1"/>
             </label>
             <p id="image-search-status" class="mt-3 text-center text-sm text-slate-500"></p>
+            <div id="crop-actions" class="hidden mt-3 flex justify-center gap-3">
+                <button id="crop-confirm-btn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-sm font-semibold shadow-sm cursor-pointer transition-colors">✅ 确定</button>
+                <button id="crop-cancel-btn" class="px-5 py-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 rounded-full text-sm font-semibold shadow-sm cursor-pointer transition-colors">取消</button>
+            </div>
             <div class="mt-4 bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-xs text-slate-500 space-y-1.5 leading-relaxed">
                 <p class="font-semibold text-slate-600">📋 使用说明</p>
                 <p>1. 支持 JPG / PNG / WEBP，建议上传清晰的零件特写或产品照片；</p>
@@ -982,48 +1016,82 @@
             return canvas.toDataURL('image/jpeg', 0.85);
         }
 
-        async function performImageSearch(file) {
-            const status = document.getElementById('image-search-status');
-            const preview = document.getElementById('image-preview');
-            const prompt = document.getElementById('image-dropzone-prompt');
-            const reuploadHint = document.getElementById('image-reupload-hint');
-            if (imageSearchBusy) {
-                status.textContent = '⏳ 正在处理上一张图片，请稍候...';
-                return;
-            }
-            if (!file || !file.type || !file.type.startsWith('image/')) {
-                status.textContent = '❌ 仅支持 JPG / PNG / WEBP 图片文件';
-                return;
-            }
-            // iPhone 相册里的 HEIC 格式浏览器无法解码，提前友好提示
-            const lowerName = (file.name || '').toLowerCase();
-            if (file.type === 'image/heic' || file.type === 'image/heif' || lowerName.endsWith('.heic') || lowerName.endsWith('.heif')) {
-                status.textContent = '❌ 检测到 HEIC 格式（iPhone 相册照片），请改用相机直接拍摄，或先转成 JPG 再上传';
-                return;
-            }
-            if (file.size > 20 * 1024 * 1024) {
-                status.textContent = '❌ 图片超过 20MB，请压缩后再试';
-                return;
-            }
-            imageSearchBusy = true;
+        let cropFile = null;
+        let cropState = null;
+        let cropDrag = null;
 
-            // 释放上一张预览图的临时 URL，避免内存堆积
-            if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);
-            // 预览图显示在框内
-            preview.src = URL.createObjectURL(file);
-            preview.classList.remove('hidden');
-            prompt.classList.add('hidden');
-            reuploadHint.classList.remove('hidden');
-            imageDropzone.classList.remove('bg-blue-50');
-            // 搜索期间先展示骨架屏，避免页面看起来像卡住
+        function getImageDisplayRect() {
+            const drop = document.getElementById('image-dropzone');
+            const img = document.getElementById('image-preview');
+            if (!drop || !img || !img.naturalWidth || !img.naturalHeight) return null;
+            const cw = drop.clientWidth;
+            const ch = drop.clientHeight;
+            const iw = img.naturalWidth, ih = img.naturalHeight;
+            const scale = Math.min(cw / iw, ch / ih);
+            const dw = iw * scale, dh = ih * scale;
+            return { left: (cw - dw) / 2, top: (ch - dh) / 2, width: dw, height: dh };
+        }
+
+        function renderCropBox() {
+            const box = document.getElementById('crop-box');
+            box.style.left = cropState.x + 'px';
+            box.style.top = cropState.y + 'px';
+            box.style.width = cropState.w + 'px';
+            box.style.height = cropState.h + 'px';
+        }
+
+        function showCropUI(file) {
+            cropFile = file;
+            // 框选时隐藏底部"点击上传/拖放"提示条，避免遮挡和误导
+            document.getElementById('image-reupload-hint').classList.add('hidden');
+            const disp = getImageDisplayRect();
+            if (!disp) return;
+            const w = disp.width * 0.7, h = disp.height * 0.7;
+            cropState = { x: disp.left + (disp.width - w) / 2, y: disp.top + (disp.height - h) / 2, w, h };
+            renderCropBox();
+            document.getElementById('crop-overlay').classList.remove('hidden');
+            document.getElementById('crop-actions').classList.remove('hidden');
+        }
+
+        function hideCropUI() {
+            document.getElementById('crop-overlay').classList.add('hidden');
+            document.getElementById('crop-actions').classList.add('hidden');
+            cropFile = null;
+            cropState = null;
+        }
+
+        async function cropAndCompress(file, sx, sy, sw, sh) {
+            const url = URL.createObjectURL(file);
+            const img = await new Promise((resolve, reject) => {
+                const im = new Image();
+                im.onload = () => resolve(im);
+                im.onerror = () => reject(new Error('图片解码失败'));
+                im.src = url;
+            });
+            const maxSide = 640;
+            const scale = Math.min(1, maxSide / Math.max(sw, sh));
+            const w = Math.max(1, Math.round(sw * scale));
+            const h = Math.max(1, Math.round(sh * scale));
+            const size = Math.max(w, h);
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, size, size);
+            ctx.drawImage(img, sx, sy, sw, sh, (size - w) / 2, (size - h) / 2, w, h);
+            URL.revokeObjectURL(url);
+            return canvas.toDataURL('image/jpeg', 0.85);
+        }
+
+        async function runImageSearch(imageData) {
+            const status = document.getElementById('image-search-status');
+            // 进入搜索后恢复底部提示（完成后可点击更换图片）
+            document.getElementById('image-reupload-hint').classList.remove('hidden');
             renderSkeletonCards(4);
-            status.textContent = '⏳ 正在计算图片特征...';
+            status.textContent = '⏳ 正在上传图片并检索相似编号...';
             const searchController = new AbortController();
             let searchTimer = null;
             try {
-                // 主模式：图片压缩后发到 Worker，由本地推理服务（上班时间电脑在线）算向量
-                const imageData = await compressImageToBase64(file);
-                status.textContent = '⏳ 正在上传图片并检索相似编号...';
                 searchTimer = setTimeout(() => searchController.abort(), 45000);
                 let res = await fetch(`${CONFIG.API_WORKER_URL}/api/image-search`, {
                     method: 'POST',
@@ -1032,11 +1100,10 @@
                     signal: searchController.signal
                 });
                 let data = await res.json().catch(() => ({}));
-
                 // 本地推理服务不可用（下班关机/隧道断线）→ 自动切换浏览器计算模式
                 if (!data.success && (data.code === 'EMBED_OFFLINE' || data.code === 'EMBED_NOT_CONFIGURED')) {
                     status.textContent = 'ℹ️ 本地推理服务暂不可用，已切换浏览器计算模式（首次需下载约 45MB 模型）...';
-                    const vector = await computeImageVector(file);
+                    const vector = await computeImageVector(cropFile);
                     status.textContent = '⏳ 正在检索相似编号...';
                     searchTimer = setTimeout(() => searchController.abort(), 30000);
                     res = await fetch(`${CONFIG.API_WORKER_URL}/api/image-search`, {
@@ -1075,8 +1142,124 @@
             } finally {
                 clearTimeout(searchTimer);
                 imageSearchBusy = false;
+                hideCropUI();
             }
         }
+
+        async function performImageSearch(file) {
+            const status = document.getElementById('image-search-status');
+            const preview = document.getElementById('image-preview');
+            const prompt = document.getElementById('image-dropzone-prompt');
+            const reuploadHint = document.getElementById('image-reupload-hint');
+            if (imageSearchBusy) {
+                status.textContent = '⏳ 正在处理上一张图片，请稍候...';
+                return;
+            }
+            if (!file || !file.type || !file.type.startsWith('image/')) {
+                status.textContent = '❌ 仅支持 JPG / PNG / WEBP 图片文件';
+                return;
+            }
+            const lowerName = (file.name || '').toLowerCase();
+            if (file.type === 'image/heic' || file.type === 'image/heif' || lowerName.endsWith('.heic') || lowerName.endsWith('.heif')) {
+                status.textContent = '❌ 检测到 HEIC 格式（iPhone 相册照片），请改用相机直接拍摄，或先转成 JPG 再上传';
+                return;
+            }
+            if (file.size > 20 * 1024 * 1024) {
+                status.textContent = '❌ 图片超过 20MB，请压缩后再试';
+                return;
+            }
+            imageSearchBusy = true;
+            if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);
+            preview.src = URL.createObjectURL(file);
+            preview.classList.remove('hidden');
+            prompt.classList.add('hidden');
+            reuploadHint.classList.remove('hidden');
+            imageDropzone.classList.remove('bg-blue-50');
+            status.textContent = '📐 请拖拽框选主体，点「确定」搜索；点「取消」退出重新选图';
+            // 等预览图加载完成后再显示裁剪框（此时 naturalWidth 才可用）
+            preview.onload = () => showCropUI(file);
+        }
+
+        function doCropSearch() {
+            if (!cropFile || !cropState) return;
+            const disp = getImageDisplayRect();
+            const img = document.getElementById('image-preview');
+            if (!disp || !img) return;
+            const sx = (cropState.x - disp.left) / disp.width * img.naturalWidth;
+            const sy = (cropState.y - disp.top) / disp.height * img.naturalHeight;
+            const sw = cropState.w / disp.width * img.naturalWidth;
+            const sh = cropState.h / disp.height * img.naturalHeight;
+            cropAndCompress(cropFile, sx, sy, sw, sh)
+                .then(imageData => runImageSearch(imageData))
+                .catch(e => {
+                    imageSearchBusy = false;
+                    document.getElementById('image-search-status').textContent = '❌ 图片裁切失败: ' + ((e && e.message) || e);
+                    hideCropUI();
+                });
+        }
+
+        function doCancelCrop() {
+            // 退出框选：清掉预览，恢复上传初始状态，允许重新选图
+            const status = document.getElementById('image-search-status');
+            const preview = document.getElementById('image-preview');
+            const prompt = document.getElementById('image-dropzone-prompt');
+            hideCropUI();
+            preview.onload = null;  // 清除残留回调，避免取消后误触发框选
+            if (preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);
+            preview.src = '';
+            preview.classList.add('hidden');
+            prompt.classList.remove('hidden');
+            imageDropzone.classList.remove('bg-blue-50');
+            imageSearchBusy = false;
+            status.textContent = '已取消，可重新上传图片';
+        }
+
+        // 框选拖拽（支持鼠标和触摸）
+        const cropBox = document.getElementById('crop-box');
+        cropBox.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            cropBox.setPointerCapture(e.pointerId);
+            const handle = e.target.closest('.crop-handle');
+            cropDrag = { mode: handle ? handle.dataset.dir : 'move', startX: e.clientX, startY: e.clientY, r: { ...cropState } };
+        });
+        cropBox.addEventListener('pointermove', (e) => {
+            if (!cropDrag || !cropState) return;
+            const dx = e.clientX - cropDrag.startX;
+            const dy = e.clientY - cropDrag.startY;
+            const r = cropDrag.r;
+            const disp = getImageDisplayRect();
+            if (!disp) return;
+            const min = 30;
+            let nx = r.x, ny = r.y, nw = r.w, nh = r.h;
+            if (cropDrag.mode === 'move') {
+                nx = Math.max(disp.left, Math.min(disp.left + disp.width - nw, r.x + dx));
+                ny = Math.max(disp.top, Math.min(disp.top + disp.height - nh, r.y + dy));
+            } else {
+                const dir = cropDrag.mode;
+                if (dir.includes('e')) nw = Math.max(min, r.w + dx);
+                if (dir.includes('s')) nh = Math.max(min, r.h + dy);
+                if (dir.includes('w')) { nw = Math.max(min, r.w - dx); nx = r.x + (r.w - nw); }
+                if (dir.includes('n')) { nh = Math.max(min, r.h - dy); ny = r.y + (r.h - nh); }
+                if (nx < disp.left) { nw -= (disp.left - nx); nx = disp.left; }
+                if (ny < disp.top) { nh -= (disp.top - ny); ny = disp.top; }
+                if (nx + nw > disp.left + disp.width) nw = disp.left + disp.width - nx;
+                if (ny + nh > disp.top + disp.height) nh = disp.top + disp.height - ny;
+                nw = Math.max(min, nw);
+                nh = Math.max(min, nh);
+            }
+            cropState = { x: nx, y: ny, w: nw, h: nh };
+            renderCropBox();
+        });
+        const endCropDrag = () => { cropDrag = null; };
+        cropBox.addEventListener('pointerup', endCropDrag);
+        cropBox.addEventListener('pointercancel', endCropDrag);
+        // 阻止拖拽后的 click 冒泡到 label（否则松开鼠标会再次弹出文件选择框）
+        cropBox.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        document.getElementById('crop-confirm-btn').addEventListener('click', doCropSearch);
+        document.getElementById('crop-cancel-btn').addEventListener('click', doCancelCrop);
 
         const imageDropzone = document.getElementById('image-dropzone');
         const imageFileInput = document.getElementById('image-file-input');
