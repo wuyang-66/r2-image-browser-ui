@@ -122,7 +122,7 @@
         <div id="search-type-switcher" class="flex justify-center mb-6 space-x-2">
             <button data-type="id" class="search-type-btn active">按编号搜索</button>
             <button data-type="name" class="search-type-btn">按名称/关键词搜索</button>
-            <button data-type="image" class="search-type-btn">图片搜索（完善中）</button>
+            <button data-type="image" class="search-type-btn">图片搜索</button>
         </div>
 
         <div class="max-w-3xl mx-auto h-6 mb-1 text-center">
@@ -174,13 +174,12 @@
                 <button id="crop-confirm-btn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-sm font-semibold shadow-sm cursor-pointer transition-colors">✅ 确定</button>
                 <button id="crop-cancel-btn" class="px-5 py-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 rounded-full text-sm font-semibold shadow-sm cursor-pointer transition-colors">取消</button>
             </div>
-            <div class="mt-4 bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-xs text-slate-500 space-y-1.5 leading-relaxed">
+            <div class="mt-4 bg-blue-50/70 border border-blue-100 rounded-xl p-4 text-base text-slate-500 space-y-1.5 leading-relaxed">
                 <p class="font-semibold text-slate-600">📋 使用说明</p>
-                <p>1. 支持 JPG / PNG / WEBP，建议上传清晰的零件特写或产品照片；</p>
-                <p>2. 拍照时尽量让零件完整入镜、光线充足、背景干净（白色背景识别效果最佳）；</p>
-                <p>3. 系统通过 AI 视觉特征在编号图库中检索，结果按相似度从高到低排序；</p>
+                <p>1. 请选择端正摆放的产品图片；</p>
+                <p>2. 请上传清晰的零件或完整产品照片；</p>
+                <p>3. 请选择光线充足、背景干净（白色背景识别效果最佳）的图片；</p>
                 <p>4. 相似度较低时可能无法准确命中，可尝试更换角度、补充光线或裁剪后重试；</p>
-                <p>5. 图片由本地服务器计算特征（更快更准）；若本地服务未开启，自动切换浏览器计算（首次需下载约 45MB 模型，仅一次）；上传图片仅用于匹配，不会对外公开。</p>
             </div>
         </div>
 
